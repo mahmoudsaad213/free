@@ -29,163 +29,330 @@ CONTACT_INFO = {
     'id': 5895491379
 }
 
+# TEMPORARY STATES
+waiting_for_user_id = {}
+waiting_for_admin_action = {}
+
 # ==============================
 # DATABASE FUNCTIONS
+def get_db_connection():
+    """Get database connection with error handling"""
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
+
 def init_db():
     """Initialize database tables"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    
-    # Users table
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT PRIMARY KEY,
-            username VARCHAR(255),
-            first_name VARCHAR(255),
-            subscription_end TIMESTAMP,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Admins table
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS admins (
-            user_id BIGINT PRIMARY KEY,
-            username VARCHAR(255),
-            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Settings table
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS settings (
-            key VARCHAR(255) PRIMARY KEY,
-            value VARCHAR(255)
-        )
-    ''')
-    
-    # Insert default settings
-    cur.execute('''
-        INSERT INTO settings (key, value) VALUES ('subscription_required', 'true')
-        ON CONFLICT (key) DO NOTHING
-    ''')
-    
-    # Insert default admin
-    cur.execute('''
-        INSERT INTO admins (user_id, username) VALUES (%s, %s)
-        ON CONFLICT (user_id) DO NOTHING
-    ''', (ADMIN_IDS[0], CONTACT_INFO['username']))
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+    conn = get_db_connection()
+    if not conn:
+        print("Failed to connect to database!")
+        return False
+        
+    try:
+        cur = conn.cursor()
+        
+        # Users table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                username VARCHAR(255),
+                first_name VARCHAR(255),
+                subscription_end TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Admins table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS admins (
+                user_id BIGINT PRIMARY KEY,
+                username VARCHAR(255),
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Settings table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key VARCHAR(255) PRIMARY KEY,
+                value VARCHAR(255)
+            )
+        ''')
+        
+        # Insert default settings
+        cur.execute('''
+            INSERT INTO settings (key, value) VALUES ('subscription_required', 'true')
+            ON CONFLICT (key) DO NOTHING
+        ''')
+        
+        # Insert default admin
+        cur.execute('''
+            INSERT INTO admins (user_id, username) VALUES (%s, %s)
+            ON CONFLICT (user_id) DO NOTHING
+        ''', (ADMIN_IDS[0], CONTACT_INFO['username']))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Database initialized successfully!")
+        return True
+        
+    except Exception as e:
+        print(f"Database initialization error: {e}")
+        conn.close()
+        return False
 
 def get_user_subscription(user_id):
     """Get user subscription info"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute('SELECT subscription_end FROM users WHERE user_id = %s', (user_id,))
-    result = cur.fetchone()
-    cur.close()
-    conn.close()
-    return result[0] if result else None
+    conn = get_db_connection()
+    if not conn:
+        return None
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT subscription_end FROM users WHERE user_id = %s', (user_id,))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Get subscription error: {e}")
+        conn.close()
+        return None
 
 def add_user(user_id, username, first_name):
     """Add new user to database"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute('''
-        INSERT INTO users (user_id, username, first_name)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (user_id) DO UPDATE SET
-        username = EXCLUDED.username,
-        first_name = EXCLUDED.first_name
-    ''', (user_id, username, first_name))
-    conn.commit()
-    cur.close()
-    conn.close()
+    conn = get_db_connection()
+    if not conn:
+        return False
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO users (user_id, username, first_name)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name
+        ''', (user_id, username, first_name))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Add user error: {e}")
+        conn.close()
+        return False
 
 def update_subscription(user_id, hours=0, days=0):
     """Update user subscription"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    
-    new_end = datetime.now() + timedelta(hours=hours, days=days)
-    
-    cur.execute('''
-        UPDATE users SET subscription_end = %s WHERE user_id = %s
-    ''', (new_end, user_id))
-    conn.commit()
-    cur.close()
-    conn.close()
+    conn = get_db_connection()
+    if not conn:
+        return False
+        
+    try:
+        cur = conn.cursor()
+        
+        new_end = datetime.now() + timedelta(hours=hours, days=days)
+        
+        # First ensure user exists
+        cur.execute('''
+            INSERT INTO users (user_id, subscription_end) VALUES (%s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET subscription_end = EXCLUDED.subscription_end
+        ''', (user_id, new_end))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Update subscription error: {e}")
+        conn.close()
+        return False
 
 def is_admin(user_id):
     """Check if user is admin"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute('SELECT user_id FROM admins WHERE user_id = %s', (user_id,))
-    result = cur.fetchone()
-    cur.close()
-    conn.close()
-    return result is not None
+    if user_id in ADMIN_IDS:  # Always check hardcoded admins first
+        return True
+        
+    conn = get_db_connection()
+    if not conn:
+        return False
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT user_id FROM admins WHERE user_id = %s', (user_id,))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result is not None
+    except Exception as e:
+        print(f"Check admin error: {e}")
+        conn.close()
+        return False
 
 def add_admin(user_id, username):
     """Add new admin"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute('''
-        INSERT INTO admins (user_id, username) VALUES (%s, %s)
-        ON CONFLICT (user_id) DO NOTHING
-    ''', (user_id, username))
-    conn.commit()
-    cur.close()
-    conn.close()
+    conn = get_db_connection()
+    if not conn:
+        return False
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            INSERT INTO admins (user_id, username) VALUES (%s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET username = EXCLUDED.username
+        ''', (user_id, username))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Add admin error: {e}")
+        conn.close()
+        return False
 
 def remove_admin(user_id):
     """Remove admin"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute('DELETE FROM admins WHERE user_id = %s', (user_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
+    if user_id in ADMIN_IDS:  # Can't remove hardcoded admins
+        return False
+        
+    conn = get_db_connection()
+    if not conn:
+        return False
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('DELETE FROM admins WHERE user_id = %s', (user_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Remove admin error: {e}")
+        conn.close()
+        return False
 
 def get_all_admins():
     """Get all admins"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute('SELECT user_id, username FROM admins')
-    result = cur.fetchall()
-    cur.close()
-    conn.close()
-    return result
+    conn = get_db_connection()
+    if not conn:
+        return []
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT user_id, username FROM admins')
+        result = cur.fetchall()
+        cur.close()
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"Get admins error: {e}")
+        conn.close()
+        return []
+
+def get_all_users():
+    """Get all users with subscription info"""
+    conn = get_db_connection()
+    if not conn:
+        return []
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT user_id, username, first_name, subscription_end, created_at 
+            FROM users 
+            ORDER BY created_at DESC 
+            LIMIT 50
+        ''')
+        result = cur.fetchall()
+        cur.close()
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"Get users error: {e}")
+        conn.close()
+        return []
+
+def get_user_stats():
+    """Get user statistics"""
+    conn = get_db_connection()
+    if not conn:
+        return {"total": 0, "active_subs": 0, "expired_subs": 0}
+        
+    try:
+        cur = conn.cursor()
+        
+        # Total users
+        cur.execute('SELECT COUNT(*) FROM users')
+        total = cur.fetchone()[0]
+        
+        # Active subscriptions
+        cur.execute('SELECT COUNT(*) FROM users WHERE subscription_end > NOW()')
+        active_subs = cur.fetchone()[0]
+        
+        # Expired subscriptions
+        cur.execute('SELECT COUNT(*) FROM users WHERE subscription_end <= NOW()')
+        expired_subs = cur.fetchone()[0]
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            "total": total,
+            "active_subs": active_subs,
+            "expired_subs": expired_subs
+        }
+    except Exception as e:
+        print(f"Get stats error: {e}")
+        conn.close()
+        return {"total": 0, "active_subs": 0, "expired_subs": 0}
 
 def is_subscription_required():
     """Check if subscription is required"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    cur.execute('SELECT value FROM settings WHERE key = %s', ('subscription_required',))
-    result = cur.fetchone()
-    cur.close()
-    conn.close()
-    return result[0] == 'true' if result else True
+    conn = get_db_connection()
+    if not conn:
+        return True  # Default to requiring subscription
+        
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT value FROM settings WHERE key = %s', ('subscription_required',))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result[0] == 'true' if result else True
+    except Exception as e:
+        print(f"Check subscription setting error: {e}")
+        conn.close()
+        return True
 
 def toggle_subscription_system():
     """Toggle subscription system on/off"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    
-    current = is_subscription_required()
-    new_value = 'false' if current else 'true'
-    
-    cur.execute('''
-        UPDATE settings SET value = %s WHERE key = %s
-    ''', (new_value, 'subscription_required'))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return not current
+    conn = get_db_connection()
+    if not conn:
+        return False
+        
+    try:
+        cur = conn.cursor()
+        
+        current = is_subscription_required()
+        new_value = 'false' if current else 'true'
+        
+        cur.execute('''
+            UPDATE settings SET value = %s WHERE key = %s
+        ''', (new_value, 'subscription_required'))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return not current
+    except Exception as e:
+        print(f"Toggle subscription error: {e}")
+        conn.close()
+        return False
 
 # ==============================
 # Stripe headers
@@ -286,6 +453,26 @@ def generate_admin_panel():
         InlineKeyboardButton("📊 Statistics", callback_data="show_stats"),
         InlineKeyboardButton("👥 All Users", callback_data="show_users")
     )
+    return markup
+
+def generate_admin_list():
+    """Generate admin management panel"""
+    markup = InlineKeyboardMarkup(row_width=1)
+    
+    admins = get_all_admins()
+    if admins:
+        markup.add(InlineKeyboardButton("📝 Current Admins:", callback_data="none"))
+        for admin_id, username in admins:
+            admin_text = f"👑 {username or 'No username'} ({admin_id})"
+            if admin_id in ADMIN_IDS:
+                admin_text += " [MAIN]"
+            markup.add(InlineKeyboardButton(admin_text, callback_data=f"admin_info_{admin_id}"))
+    
+    markup.add(
+        InlineKeyboardButton("➕ Add Admin", callback_data="add_admin"),
+        InlineKeyboardButton("➖ Remove Admin", callback_data="remove_admin")
+    )
+    markup.add(InlineKeyboardButton("🔙 Back", callback_data="admin_panel"))
     return markup
 
 def generate_subscription_panel():
@@ -485,15 +672,18 @@ def admin_panel(message):
         bot.send_message(message.chat.id, "🚫 Access denied! Admin only.")
         return
     
+    stats = get_user_stats()
+    sub_status = "ON" if is_subscription_required() else "OFF"
+    
     bot.send_message(
         message.chat.id,
-        "👑 **Admin Panel**\n\n"
-        "🔧 **System Management:**\n"
-        "• Toggle subscription system\n"
-        "• Manage administrators\n"
-        "• Add subscriptions to users\n"
-        "• View statistics\n\n"
-        "📊 Choose an option below:",
+        f"👑 **Admin Panel**\n\n"
+        f"📊 **System Status:**\n"
+        f"• Subscription System: **{sub_status}**\n"
+        f"• Total Users: **{stats['total']}**\n"
+        f"• Active Subscriptions: **{stats['active_subs']}**\n"
+        f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+        f"🔧 **Management Options:**",
         parse_mode="Markdown",
         reply_markup=generate_admin_panel()
     )
@@ -594,6 +784,93 @@ def handle_cards_text(message):
     # Start checking in thread
     threading.Thread(target=run_check, args=(message.chat.id,)).start()
 
+# Handle waiting for user ID or admin actions
+@bot.message_handler(func=lambda m: True)
+def handle_waiting_states(message):
+    user_id = message.from_user.id
+    
+    if not is_admin(user_id):
+        return
+    
+    # Handle waiting for user ID for subscription
+    if user_id in waiting_for_user_id:
+        try:
+            target_user_id = int(message.text.strip())
+            duration_data = waiting_for_user_id[user_id]
+            
+            # Add subscription
+            if duration_data['type'] == 'hours':
+                success = update_subscription(target_user_id, hours=duration_data['amount'])
+            else:
+                success = update_subscription(target_user_id, days=duration_data['amount'])
+            
+            if success:
+                bot.send_message(
+                    message.chat.id, 
+                    f"✅ Successfully added {duration_data['amount']} {duration_data['type']} subscription to user `{target_user_id}`",
+                    parse_mode="Markdown"
+                )
+            else:
+                bot.send_message(message.chat.id, "❌ Failed to add subscription. Database error.")
+            
+            del waiting_for_user_id[user_id]
+            
+        except ValueError:
+            bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.")
+    
+    # Handle waiting for admin actions
+    elif user_id in waiting_for_admin_action:
+        action = waiting_for_admin_action[user_id]
+        
+        if action == 'add_admin':
+            try:
+                # Try to extract user ID from forwarded message or direct text
+                if message.forward_from:
+                    target_user_id = message.forward_from.id
+                    target_username = message.forward_from.username
+                else:
+                    target_user_id = int(message.text.strip())
+                    target_username = None
+                
+                success = add_admin(target_user_id, target_username)
+                
+                if success:
+                    bot.send_message(
+                        message.chat.id, 
+                        f"✅ Successfully added admin: `{target_user_id}`",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    bot.send_message(message.chat.id, "❌ Failed to add admin. Database error.")
+                
+                del waiting_for_admin_action[user_id]
+                
+            except ValueError:
+                bot.send_message(message.chat.id, "❌ Invalid input. Forward a message from user or send their ID.")
+        
+        elif action == 'remove_admin':
+            try:
+                target_user_id = int(message.text.strip())
+                
+                if target_user_id in ADMIN_IDS:
+                    bot.send_message(message.chat.id, "❌ Cannot remove main admin!")
+                else:
+                    success = remove_admin(target_user_id)
+                    
+                    if success:
+                        bot.send_message(
+                            message.chat.id, 
+                            f"✅ Successfully removed admin: `{target_user_id}`",
+                            parse_mode="Markdown"
+                        )
+                    else:
+                        bot.send_message(message.chat.id, "❌ Admin not found or database error.")
+                
+                del waiting_for_admin_action[user_id]
+                
+            except ValueError:
+                bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.")
+
 # Admin commands for subscription management
 @bot.message_handler(func=lambda m: m.text and m.text.startswith('/addsub') and is_admin(m.from_user.id))
 def add_sub_command(message):
@@ -608,12 +885,18 @@ def add_sub_command(message):
         
         if duration.endswith('h'):
             hours = int(duration[:-1])
-            update_subscription(user_id, hours=hours)
-            bot.reply_to(message, f"✅ Added {hours} hours subscription to user {user_id}")
+            success = update_subscription(user_id, hours=hours)
+            if success:
+                bot.reply_to(message, f"✅ Added {hours} hours subscription to user `{user_id}`", parse_mode="Markdown")
+            else:
+                bot.reply_to(message, "❌ Failed to add subscription. Database error.")
         elif duration.endswith('d'):
             days = int(duration[:-1])
-            update_subscription(user_id, days=days)
-            bot.reply_to(message, f"✅ Added {days} days subscription to user {user_id}")
+            success = update_subscription(user_id, days=days)
+            if success:
+                bot.reply_to(message, f"✅ Added {days} days subscription to user `{user_id}`", parse_mode="Markdown")
+            else:
+                bot.reply_to(message, "❌ Failed to add subscription. Database error.")
         else:
             bot.reply_to(message, "❌ Invalid format! Use 'h' for hours or 'd' for days.")
             
@@ -633,6 +916,9 @@ def callback_query(call):
     elif call.data in ["show_approved", "show_declined", "show_cvv", "show_ccn", "show_total"]:
         bot.answer_callback_query(call.id, "ℹ️ Statistical information")
         return
+    elif call.data == "none":
+        bot.answer_callback_query(call.id, "ℹ️ Information only")
+        return
     
     # Admin only callbacks
     if not is_admin(user_id):
@@ -640,10 +926,19 @@ def callback_query(call):
         return
     
     if call.data == "admin_panel":
+        stats = get_user_stats()
+        sub_status = "ON" if is_subscription_required() else "OFF"
+        
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text="👑 **Admin Panel**\n\n🔧 Choose an option:",
+            text=f"👑 **Admin Panel**\n\n"
+                 f"📊 **System Status:**\n"
+                 f"• Subscription System: **{sub_status}**\n"
+                 f"• Total Users: **{stats['total']}**\n"
+                 f"• Active Subscriptions: **{stats['active_subs']}**\n"
+                 f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+                 f"🔧 **Management Options:**",
             parse_mode="Markdown",
             reply_markup=generate_admin_panel()
         )
@@ -651,32 +946,164 @@ def callback_query(call):
     elif call.data == "toggle_subscription":
         new_status = toggle_subscription_system()
         status_text = "ON" if new_status else "OFF"
-        bot.edit_message_reply_markup(
+        
+        # Update the panel with new status
+        stats = get_user_stats()
+        bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
+            text=f"👑 **Admin Panel**\n\n"
+                 f"📊 **System Status:**\n"
+                 f"• Subscription System: **{status_text}**\n"
+                 f"• Total Users: **{stats['total']}**\n"
+                 f"• Active Subscriptions: **{stats['active_subs']}**\n"
+                 f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+                 f"🔧 **Management Options:**",
+            parse_mode="Markdown",
             reply_markup=generate_admin_panel()
         )
         bot.answer_callback_query(call.id, f"🔄 Subscription system: {status_text}")
+    
+    elif call.data == "manage_admins":
+        admins = get_all_admins()
+        admin_list = ""
+        
+        if admins:
+            for admin_id, username in admins:
+                status = " [MAIN]" if admin_id in ADMIN_IDS else ""
+                admin_list += f"• `{admin_id}` - {username or 'No username'}{status}\n"
+        else:
+            admin_list = "No additional admins found."
+        
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=f"👑 **Admin Management**\n\n"
+                 f"📋 **Current Admins:**\n{admin_list}\n"
+                 f"🔧 **Management Options:**",
+            parse_mode="Markdown",
+            reply_markup=generate_admin_list()
+        )
+    
+    elif call.data == "add_admin":
+        waiting_for_admin_action[user_id] = 'add_admin'
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text="➕ **Add New Admin**\n\n"
+                 "📝 **Options:**\n"
+                 "• Forward a message from the user\n"
+                 "• Send their User ID directly\n\n"
+                 "👤 Send the user information now:",
+            parse_mode="Markdown"
+        )
+        bot.answer_callback_query(call.id, "📝 Send user info to add as admin")
+    
+    elif call.data == "remove_admin":
+        waiting_for_admin_action[user_id] = 'remove_admin'
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text="➖ **Remove Admin**\n\n"
+                 "📝 Send the User ID of admin to remove:\n\n"
+                 "⚠️ **Note:** Main admins cannot be removed.",
+            parse_mode="Markdown"
+        )
+        bot.answer_callback_query(call.id, "📝 Send user ID to remove admin")
     
     elif call.data == "add_subscription":
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text="💎 **Add Subscription**\n\n⚠️ Forward a message from the user or send their ID, then select duration:",
+            text="💎 **Add Subscription**\n\n"
+                 "⏰ **Select Duration:**\n"
+                 "Choose how long the subscription should last:",
             parse_mode="Markdown",
             reply_markup=generate_subscription_panel()
         )
-        # Set waiting state for user ID input
-        # This would need additional state management
+    
+    elif call.data == "show_stats":
+        stats = get_user_stats()
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=f"📊 **System Statistics**\n\n"
+                 f"👥 **Users:**\n"
+                 f"• Total Registered: **{stats['total']}**\n"
+                 f"• Active Subscriptions: **{stats['active_subs']}**\n"
+                 f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+                 f"⚙️ **System:**\n"
+                 f"• Subscription Required: **{'Yes' if is_subscription_required() else 'No'}**\n"
+                 f"• Total Admins: **{len(get_all_admins())}**",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_panel")]])
+        )
+    
+    elif call.data == "show_users":
+        users = get_all_users()
+        user_list = ""
+        
+        for i, (uid, username, first_name, sub_end, created_at) in enumerate(users[:10]):
+            status = "✅ Active" if sub_end and sub_end > datetime.now() else "❌ Expired"
+            user_list += f"{i+1}. `{uid}` - {first_name or 'No name'} ({status})\n"
+        
+        if len(users) > 10:
+            user_list += f"\n... and {len(users) - 10} more users"
+        elif not users:
+            user_list = "No users found."
+        
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=f"👥 **Recent Users**\n\n{user_list}",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_panel")]])
+        )
     
     # Subscription duration callbacks
     elif call.data.startswith("sub_"):
         duration = call.data[4:]
-        bot.answer_callback_query(call.id, f"📝 Send user ID to add {duration} subscription")
-        # This would need additional implementation for user ID input
+        
+        # Parse duration
+        if duration.endswith('h'):
+            amount = int(duration[:-1])
+            duration_type = 'hours'
+            duration_text = f"{amount} hour{'s' if amount > 1 else ''}"
+        elif duration.endswith('d'):
+            amount = int(duration[:-1])
+            duration_type = 'days'
+            duration_text = f"{amount} day{'s' if amount > 1 else ''}"
+        
+        # Store waiting state
+        waiting_for_user_id[user_id] = {
+            'amount': amount,
+            'type': duration_type
+        }
+        
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=f"💎 **Add {duration_text} Subscription**\n\n"
+                 f"📝 **Options:**\n"
+                 f"• Forward a message from the user\n"
+                 f"• Send their User ID directly\n\n"
+                 f"👤 Send the user information now:",
+            parse_mode="Markdown"
+        )
+        bot.answer_callback_query(call.id, f"📝 Send user ID for {duration_text} subscription")
+    
+    # Admin info callbacks
+    elif call.data.startswith("admin_info_"):
+        admin_id = int(call.data.split("_")[-1])
+        bot.answer_callback_query(call.id, f"ℹ️ Admin ID: {admin_id}")
 
-# Initialize database
-init_db()
+# Initialize database on startup
+if __init_success := init_db():
+    print("🤖 Bot is running with subscription system...")
+    print("✅ Database connection established")
+    print(f"👑 Main admin: {ADMIN_IDS[0]}")
+    print(f"📧 Contact: {CONTACT_INFO['username']}")
+else:
+    print("❌ Failed to initialize database! Check connection.")
 
-print("🤖 Bot is running with subscription system...")
 bot.infinity_polling()
