@@ -492,12 +492,13 @@ def generate_dashboard(chat_id):
     if not s:
         return "⚠️ No data available."
 
-    # Removed manual escaping for static text
+    # Static text, no need to escape Markdown formatting characters like **
     msg = "📊 **CARD CHECKER RESULTS**\n\n" 
     if s.get('visa_checked'):
         # Card numbers are placed in backticks, so no need to escape them with escape_markdown_v2
         card_display = str(s['visa_checked'])
         msg += f"💳 **Current:** `{card_display}`\n"
+        # Apply escape_markdown_v2 to dynamic text
         msg += f"📌 **Status:** {escape_markdown_v2(s.get('response', 'Processing...'))}\n\n"
     else:
         msg += f"📌 **Status:** {escape_markdown_v2(s.get('response', 'Starting...'))}\n\n"
@@ -511,7 +512,7 @@ def generate_dashboard(chat_id):
                 card_number = card.split("|")[0]
                 card_info = get_card_info(card_number)
                 
-                # Live cards are also placed in backticks, so no need to escape them with escape_markdown_v2
+                # Live cards are also placed in backticks, so no need for full markdown escape
                 escaped_card = str(card)
                 msg += f"`{escaped_card}`\n"
                 
@@ -575,6 +576,7 @@ def generate_admin_list():
     if admins:
         markup.add(InlineKeyboardButton("📋 Current Admins:", callback_data="none"))
         for admin_id, username in admins:
+            # Apply escape_markdown_v2 to dynamic username
             admin_text = f"👑 {escape_markdown_v2(username or 'No username')} ({admin_id})"
             if admin_id in ADMIN_IDS:
                 admin_text += " [MAIN]"
@@ -857,12 +859,12 @@ def send_welcome(message):
         bot.send_message(
             message.chat.id, 
             f"🚫 **Access Denied**\n\n"
-            f"❌ You don't have an active subscription!\n\n"
+            f"❌ You don't have an active subscription{escape_markdown_v2('!')}\n\n"
             f"👤 **Your ID:** `{user_id}`\n"
             f"👑 **Contact Admin:** {escape_markdown_v2(CONTACT_INFO['name'])}\n"
             f"📱 **Username:** {escape_markdown_v2(CONTACT_INFO['username'])}\n"
             f"🆔 **Admin ID:** `{CONTACT_INFO['id']}`\n\n"
-            f"📞 Click the button below to contact admin for subscription!",
+            f"📞 Click the button below to contact admin for subscription{escape_markdown_v2('!')}",
             parse_mode="MarkdownV2",
             reply_markup=markup
         )
@@ -895,7 +897,7 @@ def send_welcome(message):
             f"{sub_text}\n\n"
             f"📋 **Commands:**\n"
             f"• `/check` - Start card checking\n\n"
-            f"💳 Ready to check your cards!",
+            f"💳 Ready to check your cards{escape_markdown_v2('!')}",
             parse_mode="MarkdownV2"
         )
 
@@ -934,7 +936,7 @@ def ask_for_cards(message):
         bot.send_message(
             message.chat.id, 
             f"🚫 **Subscription Required**\n\n"
-            f"❌ You need an active subscription to use this service!\n\n"
+            f"❌ You need an active subscription to use this service{escape_markdown_v2('!')}\n\n"
             f"👤 **Your ID:** `{user_id}`\n"
             f"📞 Contact admin for subscription:",
             parse_mode="MarkdownV2",
@@ -949,7 +951,7 @@ def ask_for_cards(message):
         "📄 **Options:**\n"
         "• Send as text (one per line)\n"
         "• Upload .txt file\n\n"
-        "⚡ Ready to check your cards!",
+        "⚡ Ready to check your cards{escape_markdown_v2('!')}",
         parse_mode="MarkdownV2"
     )
 
