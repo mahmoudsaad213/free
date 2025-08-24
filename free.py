@@ -406,11 +406,20 @@ stripe_headers = {
 # BudgetVM headers
 budget_headers = {
     "Accept": "*/*",
+    "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
+    "Connection": "keep-alive",
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "DNT": "1",
     "Origin": "https://portal.budgetvm.com",
     "Referer": "https://portal.budgetvm.com/MyAccount/MyBilling",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors", 
+    "Sec-Fetch-Site": "same-origin",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
     "X-Requested-With": "XMLHttpRequest",
+    "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
 }
 
 # ==============================
@@ -580,25 +589,90 @@ def run_check(chat_id):
     stats[chat_id] = s
     update_message_safely(chat_id)
 
-    # Login with generated email
+    # Login with generated email using proper headers
+    login_headers = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
+        'Connection': 'keep-alive',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'DNT': '1',
+        'Origin': 'https://portal.budgetvm.com',
+        'Referer': 'https://portal.budgetvm.com/auth/login',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+        'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+    }
+    
     login_data = {"email": email, "password": "111222333"}
-    login_response = session.post("https://portal.budgetvm.com/auth/login", data=login_data)
+    login_response = session.post(
+        "https://portal.budgetvm.com/auth/login", 
+        headers=login_headers, 
+        data=login_data
+    )
+    
+    print(f"🔍 Login Response Status: {login_response.status_code}")
+    print(f"🔍 Login cookies: {list(session.cookies.keys())}")
     
     if login_response.status_code != 200:
-        s["response"] = "❌ Login failed"
+        s["response"] = f"❌ Login failed ({login_response.status_code})"
         stats[chat_id] = s
         update_message_safely(chat_id)
         return
 
-    # GoogleAsk
-    google_data = {
-        "gEmail": email,
-        "gUniqueask": "client",
-        "setup": "2",
-        "email": email,
-        "gUnique": "client"
+    # GoogleAsk with proper headers and data
+    google_headers = {
+        'Accept': '*/*',
+        'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
+        'Connection': 'keep-alive',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'DNT': '1',
+        'Origin': 'https://portal.budgetvm.com',
+        'Referer': 'https://portal.budgetvm.com/auth/login',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+        'X-Requested-With': 'XMLHttpRequest',
+        'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
     }
-    session.post("https://portal.budgetvm.com/auth/googleAsk", data=google_data)
+    
+    # Generate random gid for this session
+    import random
+    gid = str(random.randint(100000, 999999))
+    
+    google_data = {
+        'gEmail': email,
+        'gUniqueask': 'client',
+        'gIdask': gid,
+        'setup': '2',
+        'email': email,
+        'gUnique': 'client',
+        'gid': gid,
+    }
+    
+    google_response = session.post(
+        "https://portal.budgetvm.com/auth/googleAsk", 
+        headers=google_headers, 
+        data=google_data,
+        cookies=session.cookies.get_dict()
+    )
+    
+    print(f"🔍 GoogleAsk Response Status: {google_response.status_code}")
+    print(f"🔍 GoogleAsk Response: {google_response.text[:100]}...")
+    
+    if google_response.status_code != 200:
+        s["response"] = f"❌ GoogleAsk failed ({google_response.status_code})"
+        stats[chat_id] = s
+        update_message_safely(chat_id)
+        return
 
     if "ePortalv1" not in session.cookies.get_dict():
         s["response"] = "❌ Authentication failed"
