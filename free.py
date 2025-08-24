@@ -28,7 +28,7 @@ ADMIN_IDS = [5895491379]  # Your ID
 
 # CONTACT INFO
 CONTACT_INFO = {
-    'name': 'Mahmoud Saad ðŸ¥·ðŸ»',
+    'name': 'Mahmoud Saad 🥷🏻⚡️',
     'username': '@FastSpeedtest',
     'id': 5895491379
 }
