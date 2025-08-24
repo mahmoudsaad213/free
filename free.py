@@ -906,7 +906,8 @@ def admin_panel(message):
     user_id = message.from_user.id
     
     if not is_admin(user_id):
-        bot.send_message(message.chat.id, "🚫 Access denied! Admin only.", parse_mode="MarkdownV2")
+        # Escaping the period at the end of the sentence
+        bot.send_message(message.chat.id, "🚫 Access denied! Admin only" + escape_markdown_v2('.'), parse_mode="MarkdownV2")
         return
     
     stats = get_user_stats()
@@ -950,7 +951,7 @@ def ask_for_cards(message):
         "📋 **Format:** `4111111111111111|12|2025|123`\n\n"
         "📄 **Options:**\n"
         "• Send as text (one per line)\n"
-        "• Upload .txt file\n\n"
+        "• Upload .txt file\n\n" # The period here is part of the file extension, so it's fine.
         "⚡ Ready to check your cards{escape_markdown_v2('!')}",
         parse_mode="MarkdownV2"
     )
