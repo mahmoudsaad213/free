@@ -708,8 +708,8 @@ def run_check(chat_id):
 
         # Add 15 second delay between card requests (except for first card)
         if i > 0:
-            print(f"⏳ Waiting 15 seconds before next card...")
-            for countdown in range(15, 0, -1):
+            print(f"⏳ Waiting 5 seconds before next card...")
+            for countdown in range(5, 0, -1):
                 if stop_flag.get(chat_id):
                     s["response"] = "⏹️ Check stopped by user"
                     stats[chat_id] = s
