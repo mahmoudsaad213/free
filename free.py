@@ -9,7 +9,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ==============================
 # LOGIN CREDENTIALS
-EMAIL = "vefyonokna@necub.com"
+EMAIL = "turdamupse@necub.com"
 PASSWORD = "111222333"
 
 # BOT TOKEN
