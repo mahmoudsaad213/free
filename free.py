@@ -469,28 +469,35 @@ def generate_dashboard(chat_id):
         return "⚠️ No data available."
 
     msg = "📊 **CARD CHECKER RESULTS**\n\n"
-    if s['visa_checked']:
+    if s.get('visa_checked'):
         msg += f"💳 **Current:** `{s['visa_checked']}`\n"
-        msg += f"📌 **Status:** {s['response']}\n\n"
+        msg += f"📌 **Status:** {s.get('response', 'Processing...')}\n\n"
     else:
-        msg += f"📌 **Status:** {s['response']}\n\n"
+        msg += f"📌 **Status:** {s.get('response', 'Starting check...')}\n\n"
 
     msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
-    if s["lives"]:
+    if s.get("lives"):
         msg += "💳 **Live Cards:**\n"
         for card in s["lives"]:
             card_number = card.split("|")[0]
             card_info = get_card_info(card_number)
             
+            msg += f"`{card}`\n"
             if card_info:
-                msg += f"`{card}`\n"
                 msg += f"🏦 **Bank:** {card_info['Bank']}\n"
                 msg += f"🌍 **Country:** {card_info['Country']}\n"
                 msg += f"💎 **Type:** {card_info['Scheme']} {card_info['Type']}\n"
                 msg += f"🏷️ **Brand:** {card_info['Brand']}\n\n"
             else:
-                msg += f"`{card}`\n\n"
+                msg += "\n"
+
+    # ضمان ألا تكون الرسالة فارغة
+    if len(msg.strip()) < 10:
+        msg = "🔄 **Checker Status:** Initializing..."
+    
+    return msg
+
 
 
 # ================== BUTTONS ==================
