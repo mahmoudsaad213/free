@@ -9,6 +9,36 @@ import string
 from datetime import datetime, timedelta
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+
+
+def get_card_info(card_number):
+    """Get card BIN information"""
+    try:
+        bin_number = str(card_number)[:6]
+        url = f"https://lookup.binlist.net/{bin_number}"
+        
+        headers = {
+            "Accept-Version": "3"
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "BIN": bin_number,
+                "Scheme": data.get("scheme", "Unknown"),
+                "Type": data.get("type", "Unknown"),
+                "Brand": data.get("brand", "Unknown"),
+                "Country": data.get("country", {}).get("name", "Unknown"),
+                "Bank": data.get("bank", {}).get("name", "Unknown")
+            }
+        else:
+            return None
+    except Exception as e:
+        print(f"BIN lookup error: {e}")
+        return None
+
 # ==============================
 # RANDOM EMAIL GENERATOR
 def generate_email(domain="necub.com"):
@@ -28,7 +58,7 @@ ADMIN_IDS = [5895491379]  # Your ID
 
 # CONTACT INFO
 CONTACT_INFO = {
-    'name': 'Mahmoud Saad 🥷🏻⚡️',
+    'name': 'Mahmoud Saad ðŸ¥·ðŸ»',
     'username': '@FastSpeedtest',
     'id': 5895491379
 }
@@ -448,11 +478,19 @@ def generate_dashboard(chat_id):
     msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
     if s["lives"]:
-        msg += "✅ **Live Cards:**\n"
+        msg += "💳 **Live Cards:**\n"
         for card in s["lives"]:
-            msg += f"`{card}`\n"
+            card_number = card.split("|")[0]
+            card_info = get_card_info(card_number)
             
-    return msg
+            if card_info:
+                msg += f"`{card}`\n"
+                msg += f"🏦 **Bank:** {card_info['Bank']}\n"
+                msg += f"🌍 **Country:** {card_info['Country']}\n"
+                msg += f"💎 **Type:** {card_info['Scheme']} {card_info['Type']}\n"
+                msg += f"🏷️ **Brand:** {card_info['Brand']}\n\n"
+            else:
+                msg += f"`{card}`\n\n"
 
 
 # ================== BUTTONS ==================
