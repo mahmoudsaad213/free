@@ -463,46 +463,20 @@ def check_subscription(user_id):
     return False
 
 # ==============================
-# HELPER FUNCTION TO ESCAPE MARKDOWNV2
-def escape_markdown_v2(text):
-    """Escape special characters for Telegram MarkdownV2"""
-    if text is None:
-        return "Unknown"
-    
-    text = str(text)
-    # Characters that need escaping in Telegram MarkdownV2
-    # This list is comprehensive for general text outside of code blocks
-    # Note: Backticks (`) are escaped only if they are not part of a code block.
-    # Here, we escape them generally, and rely on the `...` syntax to handle literal code.
-    escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    
-    escaped_text = ""
-    for char in text:
-        if char in escape_chars:
-            escaped_text += f'\\{char}'
-        else:
-            escaped_text += char
-    
-    return escaped_text
-
-# ==============================
 # DASHBOARD FUNCTIONS
 def generate_dashboard(chat_id):
     s = stats.get(chat_id)
     if not s:
         return "⚠️ No data available."
 
-    # Removed manual escaping for static text
-    msg = "📊 **CARD CHECKER RESULTS**\n\n" 
+    msg = "📊 **CARD CHECKER RESULTS**\n\n"
     if s.get('visa_checked'):
-        # Card numbers are placed in backticks, so no need to escape them with escape_markdown_v2
-        card_display = str(s['visa_checked'])
-        msg += f"💳 **Current:** `{card_display}`\n"
-        msg += f"📌 **Status:** {escape_markdown_v2(s.get('response', 'Processing...'))}\n\n"
+        msg += f"💳 **Current:** `{s['visa_checked']}`\n"
+        msg += f"📌 **Status:** {s.get('response', 'Processing...')}\n\n"
     else:
-        msg += f"📌 **Status:** {escape_markdown_v2(s.get('response', 'Starting...'))}\n\n"
+        msg += f"📌 **Status:** {s.get('response', 'Starting...')}\n\n"
 
-    msg += "━━━━━━━━━━━━━━━━━━━\n\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
     if s.get("lives"):
         msg += "💳 **Live Cards:**\n"
@@ -511,22 +485,17 @@ def generate_dashboard(chat_id):
                 card_number = card.split("|")[0]
                 card_info = get_card_info(card_number)
                 
-                # Live cards are also placed in backticks, so no need to escape them with escape_markdown_v2
-                escaped_card = str(card)
-                msg += f"`{escaped_card}`\n"
-                
                 if card_info:
-                    # Apply escape_markdown_v2 to dynamic text from BIN lookup
-                    msg += f"🏦 **Bank:** {escape_markdown_v2(card_info['Bank'])}\n"
-                    msg += f"🌍 **Country:** {escape_markdown_v2(card_info['Country'])}\n"
-                    msg += f"💎 **Type:** {escape_markdown_v2(card_info['Scheme'])} {escape_markdown_v2(card_info['Type'])}\n"
-                    msg += f"🏷️ **Brand:** {escape_markdown_v2(card_info['Brand'])}\n\n"
+                    msg += f"`{card}`\n"
+                    msg += f"🏦 **Bank:** {card_info['Bank']}\n"
+                    msg += f"🌍 **Country:** {card_info['Country']}\n"
+                    msg += f"💎 **Type:** {card_info['Scheme']} {card_info['Type']}\n"
+                    msg += f"🏷️ **Brand:** {card_info['Brand']}\n\n"
                 else:
-                    msg += "\n"
+                    msg += f"`{card}`\n\n"
             except Exception as e:
                 print(f"Card info error: {e}")
-                escaped_card = str(card)
-                msg += f"`{escaped_card}`\n\n"
+                msg += f"`{card}`\n\n"
     
     return msg
 
@@ -573,9 +542,9 @@ def generate_admin_list():
     
     admins = get_all_admins()
     if admins:
-        markup.add(InlineKeyboardButton("📋 Current Admins:", callback_data="none"))
+        markup.add(InlineKeyboardButton("📝 Current Admins:", callback_data="none"))
         for admin_id, username in admins:
-            admin_text = f"👑 {escape_markdown_v2(username or 'No username')} ({admin_id})"
+            admin_text = f"👑 {username or 'No username'} ({admin_id})"
             if admin_id in ADMIN_IDS:
                 admin_text += " [MAIN]"
             markup.add(InlineKeyboardButton(admin_text, callback_data=f"admin_info_{admin_id}"))
@@ -630,17 +599,6 @@ def run_check(chat_id):
     if not register_account(email):
         s["response"] = "❌ Account registration failed"
         stats[chat_id] = s
-        # Update message after failure
-        try:
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=messages[chat_id],
-                text=generate_dashboard(chat_id),
-                parse_mode="MarkdownV2",
-                reply_markup=generate_buttons(chat_id)
-            )
-        except Exception as e:
-            print("Edit error on registration failure:", e)
         return
 
     # Login with generated email
@@ -650,21 +608,8 @@ def run_check(chat_id):
     if login_response.status_code != 200:
         s["response"] = "❌ Login failed"
         stats[chat_id] = s
-        # Update message after failure
-        try:
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=messages[chat_id],
-                text=generate_dashboard(chat_id),
-                parse_mode="MarkdownV2",
-                reply_markup=generate_buttons(chat_id)
-            )
-        except Exception as e:
-            print("Edit error on login failure:", e)
         return
 
-    print(f"✅ Successfully logged in with: {email}")
-    
     # GoogleAsk
     google_data = {
         "gEmail": email,
@@ -678,17 +623,6 @@ def run_check(chat_id):
     if "ePortalv1" not in session.cookies.get_dict():
         s["response"] = "❌ Login/GoogleAsk failed"
         stats[chat_id] = s
-        # Update message after failure
-        try:
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=messages[chat_id],
-                text=generate_dashboard(chat_id),
-                parse_mode="MarkdownV2",
-                reply_markup=generate_buttons(chat_id)
-            )
-        except Exception as e:
-            print("Edit error on GoogleAsk failure:", e)
         return
 
     print(f"✅ Successfully logged in with: {email}")
@@ -698,17 +632,6 @@ def run_check(chat_id):
         if stop_flag.get(chat_id):
             s["response"] = "ℹ️ Check stopped"
             stats[chat_id] = s
-            # Final update after stop
-            try:
-                bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=messages[chat_id],
-                    text=generate_dashboard(chat_id),
-                    parse_mode="MarkdownV2",
-                    reply_markup=generate_buttons(chat_id)
-                )
-            except Exception as e:
-                print("Edit error on stop:", e)
             break
 
         s["total"] += 1
@@ -716,21 +639,9 @@ def run_check(chat_id):
 
         try:
             card_number, exp_month, exp_year, cvc = card.split("|")
-        except ValueError: # Catch specific error for invalid format
+        except:
             s["cvv"] += 1
             s["response"] = "❌ Invalid card format"
-            stats[chat_id] = s
-            # Update message after each card
-            try:
-                bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=messages[chat_id],
-                    text=generate_dashboard(chat_id),
-                    parse_mode="MarkdownV2",
-                    reply_markup=generate_buttons(chat_id)
-                )
-            except Exception as e:
-                print("Edit error (invalid card format):", e)
             continue
 
         # Add 15 second delay between card requests (except for first card)
@@ -740,21 +651,10 @@ def run_check(chat_id):
                 if stop_flag.get(chat_id):
                     s["response"] = "ℹ️ Check stopped"
                     stats[chat_id] = s
-                    # Final update after stop during delay
-                    try:
-                        bot.edit_message_text(
-                            chat_id=chat_id,
-                            message_id=messages[chat_id],
-                            text=generate_dashboard(chat_id),
-                            parse_mode="MarkdownV2",
-                            reply_markup=generate_buttons(chat_id)
-                        )
-                    except Exception as e:
-                        print("Edit error on stop during delay:", e)
                     return
                 time.sleep(1)
 
-        print(f"💥 Checking card {i+1}/{len(cards)}: {card_number[:4]}****{card_number[-4:]}")
+        print(f"🔥 Checking card {i+1}/{len(cards)}: {card_number[:4]}****{card_number[-4:]}")
 
         # Stripe Token
         muid, sid, guid = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())
@@ -783,18 +683,6 @@ def run_check(chat_id):
             except:
                 s["unknown"] += 1
                 s["response"] = "❓ Unknown response"
-                stats[chat_id] = s
-                # Update message after each card
-                try:
-                    bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=messages[chat_id],
-                        text=generate_dashboard(chat_id),
-                        parse_mode="MarkdownV2",
-                        reply_markup=generate_buttons(chat_id)
-                    )
-                except Exception as e:
-                    print("Edit error (unknown response):", e)
                 continue
 
             result = str(resp_json.get("result",""))
@@ -814,30 +702,17 @@ def run_check(chat_id):
 
         stats[chat_id] = s
 
-        # Update message after each card
+        # Update message
         try:
             bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=messages[chat_id],
                 text=generate_dashboard(chat_id),
-                parse_mode="MarkdownV2",
+                parse_mode="Markdown",
                 reply_markup=generate_buttons(chat_id)
             )
         except Exception as e:
-            print("Edit error (per card update):", e)
-    
-    # Final update after loop finishes
-    try:
-        bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=messages[chat_id],
-            text=generate_dashboard(chat_id),
-            parse_mode="MarkdownV2",
-            reply_markup=generate_buttons(chat_id)
-        )
-    except Exception as e:
-        print("Edit error (final update):", e)
-
+            print("Edit error:", e)
 
 # ==============================
 # BOT COMMANDS
@@ -859,11 +734,11 @@ def send_welcome(message):
             f"🚫 **Access Denied**\n\n"
             f"❌ You don't have an active subscription!\n\n"
             f"👤 **Your ID:** `{user_id}`\n"
-            f"👑 **Contact Admin:** {escape_markdown_v2(CONTACT_INFO['name'])}\n"
-            f"📱 **Username:** {escape_markdown_v2(CONTACT_INFO['username'])}\n"
+            f"👑 **Contact Admin:** {CONTACT_INFO['name']}\n"
+            f"📱 **Username:** {CONTACT_INFO['username']}\n"
             f"🆔 **Admin ID:** `{CONTACT_INFO['id']}`\n\n"
             f"📞 Click the button below to contact admin for subscription!",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=markup
         )
         return
@@ -877,10 +752,10 @@ def send_welcome(message):
             "🚀 **Card Checker Bot**\n"
             "💳 Use /check to start checking cards\n"
             "👑 Use Admin Panel for management\n\n"
-            "📋 **Commands:**\n"
+            "📝 **Commands:**\n"
             "• `/check` - Start card checking\n"
             "• `/admin` - Admin panel",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=markup
         )
     else:
@@ -893,10 +768,10 @@ def send_welcome(message):
             f"🚀 **Card Checker Bot**\n"
             f"✅ **Subscription Status:** Active\n"
             f"{sub_text}\n\n"
-            f"📋 **Commands:**\n"
+            f"📝 **Commands:**\n"
             f"• `/check` - Start card checking\n\n"
             f"💳 Ready to check your cards!",
-            parse_mode="MarkdownV2"
+            parse_mode="Markdown"
         )
 
 @bot.message_handler(commands=['admin'])
@@ -904,7 +779,7 @@ def admin_panel(message):
     user_id = message.from_user.id
     
     if not is_admin(user_id):
-        bot.send_message(message.chat.id, "🚫 Access denied! Admin only.", parse_mode="MarkdownV2")
+        bot.send_message(message.chat.id, "🚫 Access denied! Admin only.")
         return
     
     stats = get_user_stats()
@@ -919,7 +794,7 @@ def admin_panel(message):
         f"• Active Subscriptions: **{stats['active_subs']}**\n"
         f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
         f"🔧 **Management Options:**",
-        parse_mode="MarkdownV2",
+        parse_mode="Markdown",
         reply_markup=generate_admin_panel()
     )
 
@@ -937,7 +812,7 @@ def ask_for_cards(message):
             f"❌ You need an active subscription to use this service!\n\n"
             f"👤 **Your ID:** `{user_id}`\n"
             f"📞 Contact admin for subscription:",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=markup
         )
         return
@@ -945,12 +820,12 @@ def ask_for_cards(message):
     bot.send_message(
         message.chat.id, 
         "💳 **Send your cards now!**\n\n"
-        "📋 **Format:** `4111111111111111|12|2025|123`\n\n"
-        "📄 **Options:**\n"
+        "📝 **Format:** `4111111111111111|12|2025|123`\n\n"
+        "🔄 **Options:**\n"
         "• Send as text (one per line)\n"
         "• Upload .txt file\n\n"
         "⚡ Ready to check your cards!",
-        parse_mode="MarkdownV2"
+        parse_mode="Markdown"
     )
 
 # File handler
@@ -959,11 +834,11 @@ def handle_file(message):
     user_id = message.from_user.id
     
     if not check_subscription(user_id):
-        bot.reply_to(message, "🚫 Subscription required!", parse_mode="MarkdownV2")
+        bot.reply_to(message, "🚫 Subscription required!")
         return
         
     if not message.document.file_name.endswith(".txt"):
-        bot.reply_to(message, "⚠️ Please send a .txt file only.", parse_mode="MarkdownV2")
+        bot.reply_to(message, "⚠️ Please send a .txt file only.")
         return
         
     file_info = bot.get_file(message.document.file_id)
@@ -971,7 +846,7 @@ def handle_file(message):
     cards = [line.strip() for line in file_content.splitlines() if "|" in line]
     
     if not cards:
-        bot.reply_to(message, "❌ No valid cards found in file!", parse_mode="MarkdownV2")
+        bot.reply_to(message, "❌ No valid cards found in file!")
         return
     
     user_cards[message.chat.id] = cards
@@ -981,7 +856,7 @@ def handle_file(message):
     msg = bot.send_message(
         message.chat.id, 
         generate_dashboard(message.chat.id), 
-        parse_mode="MarkdownV2",
+        parse_mode="Markdown", 
         reply_markup=generate_buttons(message.chat.id)
     )
     messages[message.chat.id] = msg.message_id
@@ -995,13 +870,13 @@ def handle_cards_text(message):
     user_id = message.from_user.id
     
     if not check_subscription(user_id):
-        bot.reply_to(message, "🚫 Subscription required!", parse_mode="MarkdownV2")
+        bot.reply_to(message, "🚫 Subscription required!")
         return
         
     cards = [line.strip() for line in message.text.splitlines() if "|" in line]
     
     if not cards:
-        bot.reply_to(message, "❌ No valid cards found!", parse_mode="MarkdownV2")
+        bot.reply_to(message, "❌ No valid cards found!")
         return
         
     user_cards[message.chat.id] = cards
@@ -1011,7 +886,7 @@ def handle_cards_text(message):
     msg = bot.send_message(
         message.chat.id, 
         generate_dashboard(message.chat.id), 
-        parse_mode="MarkdownV2",
+        parse_mode="Markdown", 
         reply_markup=generate_buttons(message.chat.id)
     )
     messages[message.chat.id] = msg.message_id
@@ -1043,15 +918,15 @@ def handle_waiting_states(message):
                 bot.send_message(
                     message.chat.id, 
                     f"✅ Successfully added {duration_data['amount']} {duration_data['type']} subscription to user `{target_user_id}`",
-                    parse_mode="MarkdownV2"
+                    parse_mode="Markdown"
                 )
             else:
-                bot.send_message(message.chat.id, "❌ Failed to add subscription. Database error.", parse_mode="MarkdownV2")
+                bot.send_message(message.chat.id, "❌ Failed to add subscription. Database error.")
             
             del waiting_for_user_id[user_id]
             
         except ValueError:
-            bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.", parse_mode="MarkdownV2")
+            bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.")
     
     # Handle waiting for admin actions
     elif user_id in waiting_for_admin_action:
@@ -1073,22 +948,22 @@ def handle_waiting_states(message):
                     bot.send_message(
                         message.chat.id, 
                         f"✅ Successfully added admin: `{target_user_id}`",
-                        parse_mode="MarkdownV2"
+                        parse_mode="Markdown"
                     )
                 else:
-                    bot.send_message(message.chat.id, "❌ Failed to add admin. Database error.", parse_mode="MarkdownV2")
+                    bot.send_message(message.chat.id, "❌ Failed to add admin. Database error.")
                 
                 del waiting_for_admin_action[user_id]
                 
             except ValueError:
-                bot.send_message(message.chat.id, "❌ Invalid input. Forward a message from user or send their ID.", parse_mode="MarkdownV2")
+                bot.send_message(message.chat.id, "❌ Invalid input. Forward a message from user or send their ID.")
         
         elif action == 'remove_admin':
             try:
                 target_user_id = int(message.text.strip())
                 
                 if target_user_id in ADMIN_IDS:
-                    bot.send_message(message.chat.id, "❌ Cannot remove main admin!", parse_mode="MarkdownV2")
+                    bot.send_message(message.chat.id, "❌ Cannot remove main admin!")
                 else:
                     success = remove_admin(target_user_id)
                     
@@ -1096,15 +971,15 @@ def handle_waiting_states(message):
                         bot.send_message(
                             message.chat.id, 
                             f"✅ Successfully removed admin: `{target_user_id}`",
-                            parse_mode="MarkdownV2"
+                            parse_mode="Markdown"
                         )
                     else:
-                        bot.send_message(message.chat.id, "❌ Admin not found or database error.", parse_mode="MarkdownV2")
+                        bot.send_message(message.chat.id, "❌ Admin not found or database error.")
                 
                 del waiting_for_admin_action[user_id]
                 
             except ValueError:
-                bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.", parse_mode="MarkdownV2")
+                bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.")
 
 # Admin commands for subscription management
 @bot.message_handler(func=lambda m: m.text and m.text.startswith('/addsub') and is_admin(m.from_user.id))
@@ -1112,7 +987,7 @@ def add_sub_command(message):
     try:
         parts = message.text.split()
         if len(parts) < 3:
-            bot.reply_to(message, "📋 **Usage:** `/addsub [user_id] [hours/days]`\n\n**Examples:**\n• `/addsub 123456789 24h`\n• `/addsub 123456789 7d`", parse_mode="MarkdownV2")
+            bot.reply_to(message, "📝 **Usage:** `/addsub [user_id] [hours/days]`\n\n**Examples:**\n• `/addsub 123456789 24h`\n• `/addsub 123456789 7d`")
             return
             
         user_id = int(parts[1])
@@ -1122,21 +997,21 @@ def add_sub_command(message):
             hours = int(duration[:-1])
             success = update_subscription(user_id, hours=hours)
             if success:
-                bot.reply_to(message, f"✅ Added {hours} hours subscription to user `{user_id}`", parse_mode="MarkdownV2")
+                bot.reply_to(message, f"✅ Added {hours} hours subscription to user `{user_id}`", parse_mode="Markdown")
             else:
-                bot.reply_to(message, "❌ Failed to add subscription. Database error.", parse_mode="MarkdownV2")
+                bot.reply_to(message, "❌ Failed to add subscription. Database error.")
         elif duration.endswith('d'):
             days = int(duration[:-1])
             success = update_subscription(user_id, days=days)
             if success:
-                bot.reply_to(message, f"✅ Added {days} days subscription to user `{user_id}`", parse_mode="MarkdownV2")
+                bot.reply_to(message, f"✅ Added {days} days subscription to user `{user_id}`", parse_mode="Markdown")
             else:
-                bot.reply_to(message, "❌ Failed to add subscription. Database error.", parse_mode="MarkdownV2")
+                bot.reply_to(message, "❌ Failed to add subscription. Database error.")
         else:
-            bot.reply_to(message, "❌ Invalid format! Use 'h' for hours or 'd' for days.", parse_mode="MarkdownV2")
+            bot.reply_to(message, "❌ Invalid format! Use 'h' for hours or 'd' for days.")
             
     except Exception as e:
-        bot.reply_to(message, f"❌ Error: {escape_markdown_v2(str(e))}", parse_mode="MarkdownV2")
+        bot.reply_to(message, f"❌ Error: {str(e)}")
 
 # Callback handlers
 @bot.callback_query_handler(func=lambda call: True)
@@ -1174,7 +1049,7 @@ def callback_query(call):
                  f"• Active Subscriptions: **{stats['active_subs']}**\n"
                  f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
                  f"🔧 **Management Options:**",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=generate_admin_panel()
         )
     
@@ -1194,7 +1069,7 @@ def callback_query(call):
                  f"• Active Subscriptions: **{stats['active_subs']}**\n"
                  f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
                  f"🔧 **Management Options:**",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=generate_admin_panel()
         )
         bot.answer_callback_query(call.id, f"🔄 Subscription system: {status_text}")
@@ -1206,7 +1081,7 @@ def callback_query(call):
         if admins:
             for admin_id, username in admins:
                 status = " [MAIN]" if admin_id in ADMIN_IDS else ""
-                admin_list += f"• `{admin_id}` - {escape_markdown_v2(username or 'No username')}{status}\n"
+                admin_list += f"• `{admin_id}` - {username or 'No username'}{status}\n"
         else:
             admin_list = "No additional admins found."
         
@@ -1216,7 +1091,7 @@ def callback_query(call):
             text=f"👑 **Admin Management**\n\n"
                  f"📋 **Current Admins:**\n{admin_list}\n"
                  f"🔧 **Management Options:**",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=generate_admin_list()
         )
     
@@ -1226,13 +1101,13 @@ def callback_query(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text="➕ **Add New Admin**\n\n"
-                 "📋 **Options:**\n"
+                 "📝 **Options:**\n"
                  "• Forward a message from the user\n"
                  "• Send their User ID directly\n\n"
                  "👤 Send the user information now:",
-            parse_mode="MarkdownV2"
+            parse_mode="Markdown"
         )
-        bot.answer_callback_query(call.id, "📋 Send user info to add as admin")
+        bot.answer_callback_query(call.id, "📝 Send user info to add as admin")
     
     elif call.data == "remove_admin":
         waiting_for_admin_action[user_id] = 'remove_admin'
@@ -1240,11 +1115,11 @@ def callback_query(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text="➖ **Remove Admin**\n\n"
-                 "📋 Send the User ID of admin to remove:\n\n"
+                 "📝 Send the User ID of admin to remove:\n\n"
                  "⚠️ **Note:** Main admins cannot be removed.",
-            parse_mode="MarkdownV2"
+            parse_mode="Markdown"
         )
-        bot.answer_callback_query(call.id, "📋 Send user ID to remove admin")
+        bot.answer_callback_query(call.id, "📝 Send user ID to remove admin")
     
     elif call.data == "add_subscription":
         bot.edit_message_text(
@@ -1253,7 +1128,7 @@ def callback_query(call):
             text="💎 **Add Subscription**\n\n"
                  "⏰ **Select Duration:**\n"
                  "Choose how long the subscription should last:",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=generate_subscription_panel()
         )
     
@@ -1270,7 +1145,7 @@ def callback_query(call):
                  f"⚙️ **System:**\n"
                  f"• Subscription Required: **{'Yes' if is_subscription_required() else 'No'}**\n"
                  f"• Total Admins: **{len(get_all_admins())}**",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_panel")]])
         )
     
@@ -1280,7 +1155,7 @@ def callback_query(call):
         
         for i, (uid, username, first_name, sub_end, created_at) in enumerate(users[:10]):
             status = "✅ Active" if sub_end and sub_end > datetime.now() else "❌ Expired"
-            user_list += f"{i+1}. `{uid}` - {escape_markdown_v2(first_name or 'No name')} ({status})\n"
+            user_list += f"{i+1}. `{uid}` - {first_name or 'No name'} ({status})\n"
         
         if len(users) > 10:
             user_list += f"\n... and {len(users) - 10} more users"
@@ -1291,7 +1166,7 @@ def callback_query(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=f"👥 **Recent Users**\n\n{user_list}",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_panel")]])
         )
     
@@ -1319,13 +1194,13 @@ def callback_query(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=f"💎 **Add {duration_text} Subscription**\n\n"
-                 f"📋 **Options:**\n"
+                 f"📝 **Options:**\n"
                  f"• Forward a message from the user\n"
                  f"• Send their User ID directly\n\n"
                  f"👤 Send the user information now:",
-            parse_mode="MarkdownV2",
+            parse_mode="Markdown"
         )
-        bot.answer_callback_query(call.id, f"📋 Send user ID for {duration_text} subscription")
+        bot.answer_callback_query(call.id, f"📝 Send user ID for {duration_text} subscription")
     
     # Admin info callbacks
     elif call.data.startswith("admin_info_"):
