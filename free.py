@@ -472,6 +472,8 @@ def escape_markdown_v2(text):
     text = str(text)
     # Characters that need escaping in Telegram MarkdownV2
     # This list is comprehensive for general text outside of code blocks
+    # Note: Backticks (`) are escaped only if they are not part of a code block.
+    # Here, we escape them generally, and rely on the `...` syntax to handle literal code.
     escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
     
     escaped_text = ""
@@ -490,34 +492,35 @@ def generate_dashboard(chat_id):
     if not s:
         return "⚠️ No data available."
 
-    msg = "📊 \\*\\*CARD CHECKER RESULTS\\*\\*\n\n" # Escaped for MarkdownV2
+    # Removed manual escaping for static text
+    msg = "📊 **CARD CHECKER RESULTS**\n\n" 
     if s.get('visa_checked'):
-        # For text inside backticks, Telegram treats it literally.
-        # So, no need to call escape_markdown_v2 here for card numbers.
+        # Card numbers are placed in backticks, so no need to escape them with escape_markdown_v2
         card_display = str(s['visa_checked'])
-        msg += f"💳 \\*\\*Current:\\*\\* `{card_display}`\n"
-        msg += f"📌 \\*\\*Status:\\*\\* {escape_markdown_v2(s.get('response', 'Processing...'))}\n\n"
+        msg += f"💳 **Current:** `{card_display}`\n"
+        msg += f"📌 **Status:** {escape_markdown_v2(s.get('response', 'Processing...'))}\n\n"
     else:
-        msg += f"📌 \\*\\*Status:\\*\\* {escape_markdown_v2(s.get('response', 'Starting...'))}\n\n"
+        msg += f"📌 **Status:** {escape_markdown_v2(s.get('response', 'Starting...'))}\n\n"
 
     msg += "━━━━━━━━━━━━━━━━━━━\n\n"
     
     if s.get("lives"):
-        msg += "💳 \\*\\*Live Cards:\\*\\*\n"
+        msg += "💳 **Live Cards:**\n"
         for card in s["lives"]:
             try:
                 card_number = card.split("|")[0]
                 card_info = get_card_info(card_number)
                 
-                # Same logic for live cards: if wrapped in backticks, no need for full markdown escape
+                # Live cards are also placed in backticks, so no need to escape them with escape_markdown_v2
                 escaped_card = str(card)
                 msg += f"`{escaped_card}`\n"
                 
                 if card_info:
-                    msg += f"🏦 \\*\\*Bank:\\*\\* {escape_markdown_v2(card_info['Bank'])}\n"
-                    msg += f"🌍 \\*\\*Country:\\*\\* {escape_markdown_v2(card_info['Country'])}\n"
-                    msg += f"💎 \\*\\*Type:\\*\\* {escape_markdown_v2(card_info['Scheme'])} {escape_markdown_v2(card_info['Type'])}\n"
-                    msg += f"🏷️ \\*\\*Brand:\\*\\* {escape_markdown_v2(card_info['Brand'])}\n\n"
+                    # Apply escape_markdown_v2 to dynamic text from BIN lookup
+                    msg += f"🏦 **Bank:** {escape_markdown_v2(card_info['Bank'])}\n"
+                    msg += f"🌍 **Country:** {escape_markdown_v2(card_info['Country'])}\n"
+                    msg += f"💎 **Type:** {escape_markdown_v2(card_info['Scheme'])} {escape_markdown_v2(card_info['Type'])}\n"
+                    msg += f"🏷️ **Brand:** {escape_markdown_v2(card_info['Brand'])}\n\n"
                 else:
                     msg += "\n"
             except Exception as e:
@@ -572,7 +575,7 @@ def generate_admin_list():
     if admins:
         markup.add(InlineKeyboardButton("📋 Current Admins:", callback_data="none"))
         for admin_id, username in admins:
-            admin_text = f"👑 {username or 'No username'} ({admin_id})"
+            admin_text = f"👑 {escape_markdown_v2(username or 'No username')} ({admin_id})"
             if admin_id in ADMIN_IDS:
                 admin_text += " [MAIN]"
             markup.add(InlineKeyboardButton(admin_text, callback_data=f"admin_info_{admin_id}"))
@@ -723,7 +726,7 @@ def run_check(chat_id):
                     chat_id=chat_id,
                     message_id=messages[chat_id],
                     text=generate_dashboard(chat_id),
-                    parse_mode="MarkdownV2", # Changed to MarkdownV2
+                    parse_mode="MarkdownV2",
                     reply_markup=generate_buttons(chat_id)
                 )
             except Exception as e:
@@ -787,7 +790,7 @@ def run_check(chat_id):
                         chat_id=chat_id,
                         message_id=messages[chat_id],
                         text=generate_dashboard(chat_id),
-                        parse_mode="MarkdownV2", # Changed to MarkdownV2
+                        parse_mode="MarkdownV2",
                         reply_markup=generate_buttons(chat_id)
                     )
                 except Exception as e:
@@ -817,7 +820,7 @@ def run_check(chat_id):
                 chat_id=chat_id,
                 message_id=messages[chat_id],
                 text=generate_dashboard(chat_id),
-                parse_mode="MarkdownV2", # Changed to MarkdownV2
+                parse_mode="MarkdownV2",
                 reply_markup=generate_buttons(chat_id)
             )
         except Exception as e:
@@ -853,14 +856,14 @@ def send_welcome(message):
         
         bot.send_message(
             message.chat.id, 
-            f"🚫 \\*\\*Access Denied\\*\\*\n\n" # Escaped for MarkdownV2
-            f"❌ You don't have an active subscription\\!\n\n" # Escaped for MarkdownV2
-            f"👤 \\*\\*Your ID:\\*\\* `{user_id}`\n" # Escaped for MarkdownV2
-            f"👑 \\*\\*Contact Admin:\\*\\* {escape_markdown_v2(CONTACT_INFO['name'])}\n" # Escaped for MarkdownV2
-            f"📱 \\*\\*Username:\\*\\* {escape_markdown_v2(CONTACT_INFO['username'])}\n" # Escaped for MarkdownV2
-            f"🆔 \\*\\*Admin ID:\\*\\* `{CONTACT_INFO['id']}`\n\n" # Escaped for MarkdownV2
-            f"📞 Click the button below to contact admin for subscription\\!", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            f"🚫 **Access Denied**\n\n"
+            f"❌ You don't have an active subscription!\n\n"
+            f"👤 **Your ID:** `{user_id}`\n"
+            f"👑 **Contact Admin:** {escape_markdown_v2(CONTACT_INFO['name'])}\n"
+            f"📱 **Username:** {escape_markdown_v2(CONTACT_INFO['username'])}\n"
+            f"🆔 **Admin ID:** `{CONTACT_INFO['id']}`\n\n"
+            f"📞 Click the button below to contact admin for subscription!",
+            parse_mode="MarkdownV2",
             reply_markup=markup
         )
         return
@@ -870,30 +873,30 @@ def send_welcome(message):
         markup.add(InlineKeyboardButton("👑 Admin Panel", callback_data="admin_panel"))
         bot.send_message(
             message.chat.id, 
-            "👋 \\*\\*Welcome Admin\\!\\*\\*\n\n" # Escaped for MarkdownV2
-            "🚀 \\*\\*Card Checker Bot\\*\\*\n" # Escaped for MarkdownV2
+            "👋 **Welcome Admin!**\n\n"
+            "🚀 **Card Checker Bot**\n"
             "💳 Use /check to start checking cards\n"
             "👑 Use Admin Panel for management\n\n"
-            "📋 \\*\\*Commands:\\*\\*\n" # Escaped for MarkdownV2
-            "• `/check` \\- Start card checking\n" # Escaped for MarkdownV2
-            "• `/admin` \\- Admin panel", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            "📋 **Commands:**\n"
+            "• `/check` - Start card checking\n"
+            "• `/admin` - Admin panel",
+            parse_mode="MarkdownV2",
             reply_markup=markup
         )
     else:
         sub_end = get_user_subscription(user_id)
-        sub_text = f"📅 \\*\\*Expires:\\*\\* {sub_end.strftime('%Y-%m-%d %H:%M UTC')}" if sub_end else "♾️ \\*\\*Unlimited\\*\\*" # Escaped for MarkdownV2
+        sub_text = f"📅 **Expires:** {sub_end.strftime('%Y-%m-%d %H:%M UTC')}" if sub_end else "♾️ **Unlimited**"
         
         bot.send_message(
             message.chat.id, 
-            f"👋 \\*\\*Welcome\\!\\*\\*\n\n" # Escaped for MarkdownV2
-            f"🚀 \\*\\*Card Checker Bot\\*\\*\n" # Escaped for MarkdownV2
-            f"✅ \\*\\*Subscription Status:\\*\\* Active\n" # Escaped for MarkdownV2
+            f"👋 **Welcome!**\n\n"
+            f"🚀 **Card Checker Bot**\n"
+            f"✅ **Subscription Status:** Active\n"
             f"{sub_text}\n\n"
-            f"📋 \\*\\*Commands:\\*\\*\n" # Escaped for MarkdownV2
-            f"• `/check` \\- Start card checking\n\n" # Escaped for MarkdownV2
-            f"💳 Ready to check your cards\\!", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2" # Changed to MarkdownV2
+            f"📋 **Commands:**\n"
+            f"• `/check` - Start card checking\n\n"
+            f"💳 Ready to check your cards!",
+            parse_mode="MarkdownV2"
         )
 
 @bot.message_handler(commands=['admin'])
@@ -901,7 +904,7 @@ def admin_panel(message):
     user_id = message.from_user.id
     
     if not is_admin(user_id):
-        bot.send_message(message.chat.id, "🚫 Access denied\\! Admin only\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+        bot.send_message(message.chat.id, "🚫 Access denied! Admin only.", parse_mode="MarkdownV2")
         return
     
     stats = get_user_stats()
@@ -909,14 +912,14 @@ def admin_panel(message):
     
     bot.send_message(
         message.chat.id,
-        f"👑 \\*\\*Admin Panel\\*\\*\n\n" # Escaped for MarkdownV2
-        f"📊 \\*\\*System Status:\\*\\*\n" # Escaped for MarkdownV2
-        f"• Subscription System: \\*\\*{sub_status}\\*\\*\n" # Escaped for MarkdownV2
-        f"• Total Users: \\*\\*{stats['total']}\\*\\*\n" # Escaped for MarkdownV2
-        f"• Active Subscriptions: \\*\\*{stats['active_subs']}\\*\\*\n" # Escaped for MarkdownV2
-        f"• Expired Subscriptions: \\*\\*{stats['expired_subs']}\\*\\*\n\n" # Escaped for MarkdownV2
-        f"🔧 \\*\\*Management Options:\\*\\*", # Escaped for MarkdownV2
-        parse_mode="MarkdownV2", # Changed to MarkdownV2
+        f"👑 **Admin Panel**\n\n"
+        f"📊 **System Status:**\n"
+        f"• Subscription System: **{sub_status}**\n"
+        f"• Total Users: **{stats['total']}**\n"
+        f"• Active Subscriptions: **{stats['active_subs']}**\n"
+        f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+        f"🔧 **Management Options:**",
+        parse_mode="MarkdownV2",
         reply_markup=generate_admin_panel()
     )
 
@@ -930,24 +933,24 @@ def ask_for_cards(message):
         
         bot.send_message(
             message.chat.id, 
-            f"🚫 \\*\\*Subscription Required\\*\\*\n\n" # Escaped for MarkdownV2
-            f"❌ You need an active subscription to use this service\\!\n\n" # Escaped for MarkdownV2
-            f"👤 \\*\\*Your ID:\\*\\* `{user_id}`\n" # Escaped for MarkdownV2
+            f"🚫 **Subscription Required**\n\n"
+            f"❌ You need an active subscription to use this service!\n\n"
+            f"👤 **Your ID:** `{user_id}`\n"
             f"📞 Contact admin for subscription:",
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            parse_mode="MarkdownV2",
             reply_markup=markup
         )
         return
     
     bot.send_message(
         message.chat.id, 
-        "💳 \\*\\*Send your cards now\\!\\*\\*\n\n" # Escaped for MarkdownV2
-        "📋 \\*\\*Format:\\*\\* `4111111111111111|12|2025|123`\n\n" # Escaped for MarkdownV2
-        "📄 \\*\\*Options:\\*\\*\n" # Escaped for MarkdownV2
-        "• Send as text \\(one per line\\)\n" # Escaped for MarkdownV2
-        "• Upload \\.txt file\n\n" # Escaped for MarkdownV2
-        "⚡ Ready to check your cards\\!", # Escaped for MarkdownV2
-        parse_mode="MarkdownV2" # Changed to MarkdownV2
+        "💳 **Send your cards now!**\n\n"
+        "📋 **Format:** `4111111111111111|12|2025|123`\n\n"
+        "📄 **Options:**\n"
+        "• Send as text (one per line)\n"
+        "• Upload .txt file\n\n"
+        "⚡ Ready to check your cards!",
+        parse_mode="MarkdownV2"
     )
 
 # File handler
@@ -956,11 +959,11 @@ def handle_file(message):
     user_id = message.from_user.id
     
     if not check_subscription(user_id):
-        bot.reply_to(message, "🚫 Subscription required\\!", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+        bot.reply_to(message, "🚫 Subscription required!", parse_mode="MarkdownV2")
         return
         
     if not message.document.file_name.endswith(".txt"):
-        bot.reply_to(message, "⚠️ Please send a \\.txt file only\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+        bot.reply_to(message, "⚠️ Please send a .txt file only.", parse_mode="MarkdownV2")
         return
         
     file_info = bot.get_file(message.document.file_id)
@@ -968,7 +971,7 @@ def handle_file(message):
     cards = [line.strip() for line in file_content.splitlines() if "|" in line]
     
     if not cards:
-        bot.reply_to(message, "❌ No valid cards found in file\\!", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+        bot.reply_to(message, "❌ No valid cards found in file!", parse_mode="MarkdownV2")
         return
     
     user_cards[message.chat.id] = cards
@@ -978,7 +981,7 @@ def handle_file(message):
     msg = bot.send_message(
         message.chat.id, 
         generate_dashboard(message.chat.id), 
-        parse_mode="MarkdownV2", # Changed to MarkdownV2
+        parse_mode="MarkdownV2",
         reply_markup=generate_buttons(message.chat.id)
     )
     messages[message.chat.id] = msg.message_id
@@ -992,13 +995,13 @@ def handle_cards_text(message):
     user_id = message.from_user.id
     
     if not check_subscription(user_id):
-        bot.reply_to(message, "🚫 Subscription required\\!", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+        bot.reply_to(message, "🚫 Subscription required!", parse_mode="MarkdownV2")
         return
         
     cards = [line.strip() for line in message.text.splitlines() if "|" in line]
     
     if not cards:
-        bot.reply_to(message, "❌ No valid cards found\\!", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+        bot.reply_to(message, "❌ No valid cards found!", parse_mode="MarkdownV2")
         return
         
     user_cards[message.chat.id] = cards
@@ -1008,7 +1011,7 @@ def handle_cards_text(message):
     msg = bot.send_message(
         message.chat.id, 
         generate_dashboard(message.chat.id), 
-        parse_mode="MarkdownV2", # Changed to MarkdownV2
+        parse_mode="MarkdownV2",
         reply_markup=generate_buttons(message.chat.id)
     )
     messages[message.chat.id] = msg.message_id
@@ -1040,15 +1043,15 @@ def handle_waiting_states(message):
                 bot.send_message(
                     message.chat.id, 
                     f"✅ Successfully added {duration_data['amount']} {duration_data['type']} subscription to user `{target_user_id}`",
-                    parse_mode="MarkdownV2" # Changed to MarkdownV2
+                    parse_mode="MarkdownV2"
                 )
             else:
-                bot.send_message(message.chat.id, "❌ Failed to add subscription\\. Database error\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                bot.send_message(message.chat.id, "❌ Failed to add subscription. Database error.", parse_mode="MarkdownV2")
             
             del waiting_for_user_id[user_id]
             
         except ValueError:
-            bot.send_message(message.chat.id, "❌ Invalid user ID\\. Please send a valid number\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+            bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.", parse_mode="MarkdownV2")
     
     # Handle waiting for admin actions
     elif user_id in waiting_for_admin_action:
@@ -1070,22 +1073,22 @@ def handle_waiting_states(message):
                     bot.send_message(
                         message.chat.id, 
                         f"✅ Successfully added admin: `{target_user_id}`",
-                        parse_mode="MarkdownV2" # Changed to MarkdownV2
+                        parse_mode="MarkdownV2"
                     )
                 else:
-                    bot.send_message(message.chat.id, "❌ Failed to add admin\\. Database error\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                    bot.send_message(message.chat.id, "❌ Failed to add admin. Database error.", parse_mode="MarkdownV2")
                 
                 del waiting_for_admin_action[user_id]
                 
             except ValueError:
-                bot.send_message(message.chat.id, "❌ Invalid input\\. Forward a message from user or send their ID\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                bot.send_message(message.chat.id, "❌ Invalid input. Forward a message from user or send their ID.", parse_mode="MarkdownV2")
         
         elif action == 'remove_admin':
             try:
                 target_user_id = int(message.text.strip())
                 
                 if target_user_id in ADMIN_IDS:
-                    bot.send_message(message.chat.id, "❌ Cannot remove main admin\\!", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                    bot.send_message(message.chat.id, "❌ Cannot remove main admin!", parse_mode="MarkdownV2")
                 else:
                     success = remove_admin(target_user_id)
                     
@@ -1093,15 +1096,15 @@ def handle_waiting_states(message):
                         bot.send_message(
                             message.chat.id, 
                             f"✅ Successfully removed admin: `{target_user_id}`",
-                            parse_mode="MarkdownV2" # Changed to MarkdownV2
+                            parse_mode="MarkdownV2"
                         )
                     else:
-                        bot.send_message(message.chat.id, "❌ Admin not found or database error\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                        bot.send_message(message.chat.id, "❌ Admin not found or database error.", parse_mode="MarkdownV2")
                 
                 del waiting_for_admin_action[user_id]
                 
             except ValueError:
-                bot.send_message(message.chat.id, "❌ Invalid user ID\\. Please send a valid number\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                bot.send_message(message.chat.id, "❌ Invalid user ID. Please send a valid number.", parse_mode="MarkdownV2")
 
 # Admin commands for subscription management
 @bot.message_handler(func=lambda m: m.text and m.text.startswith('/addsub') and is_admin(m.from_user.id))
@@ -1109,7 +1112,7 @@ def add_sub_command(message):
     try:
         parts = message.text.split()
         if len(parts) < 3:
-            bot.reply_to(message, "📋 \\*\\*Usage:\\*\\* `/addsub [user_id] [hours/days]`\n\n\\*\\*Examples:\\*\\*\n• `/addsub 123456789 24h`\n• `/addsub 123456789 7d`", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+            bot.reply_to(message, "📋 **Usage:** `/addsub [user_id] [hours/days]`\n\n**Examples:**\n• `/addsub 123456789 24h`\n• `/addsub 123456789 7d`", parse_mode="MarkdownV2")
             return
             
         user_id = int(parts[1])
@@ -1119,21 +1122,21 @@ def add_sub_command(message):
             hours = int(duration[:-1])
             success = update_subscription(user_id, hours=hours)
             if success:
-                bot.reply_to(message, f"✅ Added {hours} hours subscription to user `{user_id}`", parse_mode="MarkdownV2") # Changed to MarkdownV2
+                bot.reply_to(message, f"✅ Added {hours} hours subscription to user `{user_id}`", parse_mode="MarkdownV2")
             else:
-                bot.reply_to(message, "❌ Failed to add subscription\\. Database error\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                bot.reply_to(message, "❌ Failed to add subscription. Database error.", parse_mode="MarkdownV2")
         elif duration.endswith('d'):
             days = int(duration[:-1])
             success = update_subscription(user_id, days=days)
             if success:
-                bot.reply_to(message, f"✅ Added {days} days subscription to user `{user_id}`", parse_mode="MarkdownV2") # Changed to MarkdownV2
+                bot.reply_to(message, f"✅ Added {days} days subscription to user `{user_id}`", parse_mode="MarkdownV2")
             else:
-                bot.reply_to(message, "❌ Failed to add subscription\\. Database error\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+                bot.reply_to(message, "❌ Failed to add subscription. Database error.", parse_mode="MarkdownV2")
         else:
-            bot.reply_to(message, "❌ Invalid format\\! Use 'h' for hours or 'd' for days\\.", parse_mode="MarkdownV2") # Escaped for MarkdownV2
+            bot.reply_to(message, "❌ Invalid format! Use 'h' for hours or 'd' for days.", parse_mode="MarkdownV2")
             
     except Exception as e:
-        bot.reply_to(message, f"❌ Error: {escape_markdown_v2(str(e))}", parse_mode="MarkdownV2") # Changed to MarkdownV2
+        bot.reply_to(message, f"❌ Error: {escape_markdown_v2(str(e))}", parse_mode="MarkdownV2")
 
 # Callback handlers
 @bot.callback_query_handler(func=lambda call: True)
@@ -1154,7 +1157,7 @@ def callback_query(call):
     
     # Admin only callbacks
     if not is_admin(user_id):
-        bot.answer_callback_query(call.id, "🚫 Admin only\\!") # Escaped for MarkdownV2
+        bot.answer_callback_query(call.id, "🚫 Admin only!")
         return
     
     if call.data == "admin_panel":
@@ -1164,14 +1167,14 @@ def callback_query(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=f"👑 \\*\\*Admin Panel\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"📊 \\*\\*System Status:\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Subscription System: \\*\\*{sub_status}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Total Users: \\*\\*{stats['total']}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Active Subscriptions: \\*\\*{stats['active_subs']}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Expired Subscriptions: \\*\\*{stats['expired_subs']}\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"🔧 \\*\\*Management Options:\\*\\*", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            text=f"👑 **Admin Panel**\n\n"
+                 f"📊 **System Status:**\n"
+                 f"• Subscription System: **{sub_status}**\n"
+                 f"• Total Users: **{stats['total']}**\n"
+                 f"• Active Subscriptions: **{stats['active_subs']}**\n"
+                 f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+                 f"🔧 **Management Options:**",
+            parse_mode="MarkdownV2",
             reply_markup=generate_admin_panel()
         )
     
@@ -1184,14 +1187,14 @@ def callback_query(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=f"👑 \\*\\*Admin Panel\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"📊 \\*\\*System Status:\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Subscription System: \\*\\*{status_text}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Total Users: \\*\\*{stats['total']}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Active Subscriptions: \\*\\*{stats['active_subs']}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Expired Subscriptions: \\*\\*{stats['expired_subs']}\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"🔧 \\*\\*Management Options:\\*\\*", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            text=f"👑 **Admin Panel**\n\n"
+                 f"📊 **System Status:**\n"
+                 f"• Subscription System: **{status_text}**\n"
+                 f"• Total Users: **{stats['total']}**\n"
+                 f"• Active Subscriptions: **{stats['active_subs']}**\n"
+                 f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+                 f"🔧 **Management Options:**",
+            parse_mode="MarkdownV2",
             reply_markup=generate_admin_panel()
         )
         bot.answer_callback_query(call.id, f"🔄 Subscription system: {status_text}")
@@ -1202,18 +1205,18 @@ def callback_query(call):
         
         if admins:
             for admin_id, username in admins:
-                status = " \\[MAIN\\]" if admin_id in ADMIN_IDS else "" # Escaped for MarkdownV2
-                admin_list += f"• `{admin_id}` \\- {escape_markdown_v2(username or 'No username')}{status}\n" # Escaped for MarkdownV2
+                status = " [MAIN]" if admin_id in ADMIN_IDS else ""
+                admin_list += f"• `{admin_id}` - {escape_markdown_v2(username or 'No username')}{status}\n"
         else:
-            admin_list = "No additional admins found\\." # Escaped for MarkdownV2
+            admin_list = "No additional admins found."
         
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=f"👑 \\*\\*Admin Management\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"📋 \\*\\*Current Admins:\\*\\*\n{admin_list}\n" # Escaped for MarkdownV2
-                 f"🔧 \\*\\*Management Options:\\*\\*", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            text=f"👑 **Admin Management**\n\n"
+                 f"📋 **Current Admins:**\n{admin_list}\n"
+                 f"🔧 **Management Options:**",
+            parse_mode="MarkdownV2",
             reply_markup=generate_admin_list()
         )
     
@@ -1222,12 +1225,12 @@ def callback_query(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text="➕ \\*\\*Add New Admin\\*\\*\n\n" # Escaped for MarkdownV2
-                 "📋 \\*\\*Options:\\*\\*\n" # Escaped for MarkdownV2
+            text="➕ **Add New Admin**\n\n"
+                 "📋 **Options:**\n"
                  "• Forward a message from the user\n"
                  "• Send their User ID directly\n\n"
                  "👤 Send the user information now:",
-            parse_mode="MarkdownV2" # Changed to MarkdownV2
+            parse_mode="MarkdownV2"
         )
         bot.answer_callback_query(call.id, "📋 Send user info to add as admin")
     
@@ -1236,10 +1239,10 @@ def callback_query(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text="➖ \\*\\*Remove Admin\\*\\*\n\n" # Escaped for MarkdownV2
+            text="➖ **Remove Admin**\n\n"
                  "📋 Send the User ID of admin to remove:\n\n"
-                 "⚠️ \\*\\*Note:\\*\\* Main admins cannot be removed\\.", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2" # Changed to MarkdownV2
+                 "⚠️ **Note:** Main admins cannot be removed.",
+            parse_mode="MarkdownV2"
         )
         bot.answer_callback_query(call.id, "📋 Send user ID to remove admin")
     
@@ -1247,10 +1250,10 @@ def callback_query(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text="💎 \\*\\*Add Subscription\\*\\*\n\n" # Escaped for MarkdownV2
-                 "⏰ \\*\\*Select Duration:\\*\\*\n" # Escaped for MarkdownV2
+            text="💎 **Add Subscription**\n\n"
+                 "⏰ **Select Duration:**\n"
                  "Choose how long the subscription should last:",
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            parse_mode="MarkdownV2",
             reply_markup=generate_subscription_panel()
         )
     
@@ -1259,15 +1262,15 @@ def callback_query(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=f"📊 \\*\\*System Statistics\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"👥 \\*\\*Users:\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Total Registered: \\*\\*{stats['total']}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Active Subscriptions: \\*\\*{stats['active_subs']}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Expired Subscriptions: \\*\\*{stats['expired_subs']}\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"⚙️ \\*\\*System:\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Subscription Required: \\*\\*{'Yes' if is_subscription_required() else 'No'}\\*\\*\n" # Escaped for MarkdownV2
-                 f"• Total Admins: \\*\\*{len(get_all_admins())}\\*\\*", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            text=f"📊 **System Statistics**\n\n"
+                 f"👥 **Users:**\n"
+                 f"• Total Registered: **{stats['total']}**\n"
+                 f"• Active Subscriptions: **{stats['active_subs']}**\n"
+                 f"• Expired Subscriptions: **{stats['expired_subs']}**\n\n"
+                 f"⚙️ **System:**\n"
+                 f"• Subscription Required: **{'Yes' if is_subscription_required() else 'No'}**\n"
+                 f"• Total Admins: **{len(get_all_admins())}**",
+            parse_mode="MarkdownV2",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_panel")]])
         )
     
@@ -1277,18 +1280,18 @@ def callback_query(call):
         
         for i, (uid, username, first_name, sub_end, created_at) in enumerate(users[:10]):
             status = "✅ Active" if sub_end and sub_end > datetime.now() else "❌ Expired"
-            user_list += f"{i+1}\\. `{uid}` \\- {escape_markdown_v2(first_name or 'No name')} \\({status}\\)\n" # Escaped for MarkdownV2
+            user_list += f"{i+1}. `{uid}` - {escape_markdown_v2(first_name or 'No name')} ({status})\n"
         
         if len(users) > 10:
-            user_list += f"\n\\.\\.\\. and {len(users) - 10} more users" # Escaped for MarkdownV2
+            user_list += f"\n... and {len(users) - 10} more users"
         elif not users:
-            user_list = "No users found\\." # Escaped for MarkdownV2
+            user_list = "No users found."
         
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=f"👥 \\*\\*Recent Users\\*\\*\n\n{user_list}", # Escaped for MarkdownV2
-            parse_mode="MarkdownV2", # Changed to MarkdownV2
+            text=f"👥 **Recent Users**\n\n{user_list}",
+            parse_mode="MarkdownV2",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="admin_panel")]])
         )
     
@@ -1315,12 +1318,12 @@ def callback_query(call):
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
-            text=f"💎 \\*\\*Add {duration_text} Subscription\\*\\*\n\n" # Escaped for MarkdownV2
-                 f"📋 \\*\\*Options:\\*\\*\n" # Escaped for MarkdownV2
+            text=f"💎 **Add {duration_text} Subscription**\n\n"
+                 f"📋 **Options:**\n"
                  f"• Forward a message from the user\n"
                  f"• Send their User ID directly\n\n"
                  f"👤 Send the user information now:",
-            parse_mode="MarkdownV2" # Changed to MarkdownV2
+            parse_mode="MarkdownV2",
         )
         bot.answer_callback_query(call.id, f"📋 Send user ID for {duration_text} subscription")
     
